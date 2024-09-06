@@ -1,26 +1,21 @@
 -- SQL-скрипт, который прекращает распределённый запрос
 -- в виде объединённых общим sess_id процессов на мастере и сегментах.
 -- Прекращение запроса происходит через вызовы на сегментах и мастере
--- либо функции pg_cancel_backend(pid) (SIGINT, сигнал 2)
--- либо функции pg_terminate_backend(pid) (SIGTERM, сигнал 15).
--- с соответствующими pid процессов на сегментах и мастере по общему sess_id.
+-- функции pg_terminate_backend(pid) с pid-ами по общему sess_id.
+-- Если функция pg_terminate_backend() не поможет,
+-- то SQL-скрипт предлагает список pid и примеры команд gpssh
+-- которые необходимо выполнить на мастере.
 
 
--- Ввести ID сессии распределённого запроса:
+-- \prompt 'Enter process PID on master: ' pid_to_kill
+-- Получаем общий sess_id и записываем в переменную sess_to_kill:
+-- SELECT sess_id AS sess_to_kill
+  -- FROM pg_stat_activity
+-- WHERE pid = :pid_to_kill \gset
+
+
 \prompt 'Enter your sess_id: ' sess_to_kill
 \echo :sess_to_kill
-
-
--- выбрать тип используемой функции:
-\prompt 'Terminate or cancel backend? Terminate sends SIGTERM signal (15) and terminate process. Cancel sends SIGINT signal (2) and interrupt process. Type "t" for SIGTERM or any_key for SIGINT: ' term_or_cancel
-
-SELECT CASE t_var.what
-         WHEN 't' THEN 'pg_terminate_backend'
-         ELSE 'pg_cancel_backend'
-       END AS kill_function 
-  FROM (SELECT :'term_or_cancel' what) t_var
-\gset
-\echo :kill_function
 
 
 -- создаём представление, чтобы можно было её использовать повторно.
@@ -54,21 +49,10 @@ CREATE TEMP TABLE pids_tmp AS SELECT * FROM pids_view
 \echo  Список сегментов, pid и номер сессии по данному запросу:
 SELECT * FROM pids_tmp;
 
-
 \echo  отключаем бекенды на сегментах:
 SELECT gdr.gp_segment_id   gdr_seg,
        pids_tmp.segment_id pons_seg,
-       -- pg_cancel_backend(pids_tmp.pid, 
-       (:kill_function(pids_tmp.pid, 
-         (
-          'killed pid = '     ||
-           pids_tmp.pid::text ||
-          ', sess_id = '      ||
-           pids_tmp.sess_id   ||
-          ', gpseg = '        ||
-           pids_tmp.segment_id::text
-         )
-       )),
+       (pg_terminate_backend(pids_tmp.pid)),
        pids_tmp.pid pons_pid
   FROM gp_dist_random('gp_id') gdr,
        pids_tmp
@@ -77,16 +61,13 @@ SELECT gdr.gp_segment_id   gdr_seg,
 ;
 
 
--- Паузу в 5 секунд я сделал потому, что
--- иногда данные для pids_view не успевали обновляться
 \echo  Пауза 5 секунд:
 SELECT pg_sleep(5);
 \echo  Проверяем через pids_view:
 SELECT * FROM pids_view;
 
-\q
 \echo  Отключаем бекенд на мастере:
-SELECT :kill_function(pid)
+SELECT pg_terminate_backend(pid)
   FROM pg_stat_activity
  WHERE sess_id = :sess_to_kill;
 \echo  Проверяем через pids_view:
@@ -103,17 +84,6 @@ SELECT content segment_No, address, pid
  ORDER BY address, content
 ;
 
-\q
-
-
-
-
-\quit
--- Данные действия ниже пока не являются рекомендуемыми!
-
--- Если функция pg_terminate_backend() не поможет,
--- то SQL-скрипт предлагает список pid и примеры команд gpssh
--- которые необходимо выполнить на мастере.
 
 -- Если дочерний процесс postgres зависнет,
 -- то он может не позволить процессу postmaster
