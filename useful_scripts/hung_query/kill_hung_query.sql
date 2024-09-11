@@ -1,44 +1,142 @@
--- SQL-скрипт, который прекращает распределённый запрос
+-- kill_hung_query.sql
+
+
+-- psql-скрипт, который прекращает распределённый SQL-запрос
 -- в виде объединённых общим sess_id процессов на мастере и сегментах.
--- Прекращение запроса происходит через вызовы на сегментах и мастере:
--- 1. либо функции pg_cancel_backend(pid) (SIGINT, сигнал 2)
--- 2. либо функции pg_terminate_backend(pid) (SIGTERM, сигнал 15).
--- с соответствующими pid процессов на сегментах и мастере по общему sess_id.
+-- Отправка сигналов на сегментах и мастере происходит через функции:
+-- 1. pg_terminate_backend(pid) (SIGTERM, сигнал 15) - завершает процесс
+-- 2. pg_cancel_backend(pid) (SIGINT, сигнал 2) - отменяет запрос
+-- Сигналы передаются на соответствующие pid процессов на сегментах
+-- и на мастере по общему sess_id.
 
 
--- данная база гарантированно присутствует в СУБД:
+\setenv PGAPPNAME 'kill_hung_query'
+\setenv QUIET on
+-- переподключаемся к template1, чтобы активировать переменные setenv:
 \c template1
-
--- Логирование скрипта /home/gpadmin/gpAdminLogs/:
--- Это будет срабатывать только если запустить данный скрипт
--- локально на мастер-ноде:
--- SELECT to_char(now(), 'YYYYMMDD') today \gset
--- \set logfile /home/gpadmin/gpAdminLogs/kill_hung_query_:today.log
--- \o :logfile
+-- меняет формат вывода утилитой psql:
+\pset tuples_only on
+\pset format unaligned
 
 
--- Ввести ID сессии распределённого запроса:
-\echo Enter your sess_id:
-\prompt sess_to_kill
+-- записываем строку команды psql с запущенным скриптом:
+\! echo "SELECT '$(ps -eo pid,command | grep psql | grep kill_hung_query.sql | grep -v grep | cut -d ' ' -f1)' AS psql_pid, '$(ps -eo command | grep psql | grep kill_hung_query.sql | grep -v grep)' AS psql_command \gset" > /tmp/kill_hung_query.tmp
+\i /tmp/kill_hung_query.tmp
 
--- выбрать тип используемой функции:
-\echo Terminate or cancel backend?
-\echo Terminate sends SIGTERM signal (15) and terminate process.
-\echo Cancel sends SIGINT signal (2) and interrupt process.
-\echo Type "t" for SIGTERM or any_key for SIGINT:
-\prompt term_or_cancel
 
-SELECT CASE t_var.what
-         WHEN 't' THEN 'pg_terminate_backend'
-         ELSE 'pg_cancel_backend'
-       END AS kill_function 
-  FROM (SELECT :'term_or_cancel' what) t_var
+-- ПРОВЕРКА sses_id
+-- проверка на то, что задана переменная sess_id.
+-- Если sess_id не задана, то скрипт выводит USAGE (help) и выходит
+\set sess_to_kill :sess_id
+\set sess_id NULL:sess_id
+
+SELECT CASE
+         WHEN what.sess_id = 'NULL'
+           OR what.sess_id = 'NULL:sess_id' THEN '
+SELECT ''
+      Инструкция по использованию скрипта (USAGE).
+  Необходимо выполнить команду вида:
+  psql template1 -U gpadmin --set=sess_id=1234 --set=signal=SIGTERM \
+    -f /home/gpadmin/arenadata_configs/kill_hung_query.sql
+
+  Где опции в строке означают:
+  -f - путь к текущему файлу-скрипту.
+
+  --set=sess_id - ID сессии распределённого SQL-запроса.
+  Если --set=sess_id не указана, то скрипт выведет данную инструкцию
+  по использованию скрипта (USAGE) и завершит работу.
+
+  --set=signal  - необходимо ввести тип посылаемого сигнала:
+      - SIGTERM - завершает процессы (signal 15).
+      - SIGINT  - прерывает запрос, не прерывая процессы (signal 2).
+  Опцию --set=signal можно не указывать.
+  В этом случае будет использоваться сигнал SIGTERM.
+
+    Дополнительные параметры:
+  По умолчанию скрипт сохраняет вывод в лог-файл:
+  /home/gpadmin/gpAdminLogs/kill_hung_query_YYYYMMDD.log
+  Перенаправить лог в другой файл можно с помощью опции:
+  --set=log=/path_to/file.log - сохранить в лог-файл /path_to/file.log.
+'';
+\quit
+'
+         ELSE 'SELECT ''Looking for sess_id='||trim('NULL' from what.sess_id)||''';'
+       END AS show_help_or_sess_id
+  FROM (SELECT :'sess_id' sess_id) what
 \gset
-\echo :kill_function
+
+-- Выводит либо HELP либо sess_id:
+:show_help_or_sess_id
+-- возвращаем значение для переменной sess_id:
+\set sess_id :sess_to_kill
 
 
+-- Запишет в переменную app_name значение:
+SELECT application_name AS app_name
+  FROM pg_stat_activity
+ WHERE pid = pg_backend_pid() \gset
+
+
+-- ОПРЕДЕЛЯЕМСЯ С ЛОГ-ФАЙЛОМ
+-- Если (по умолчанию) лог-файл не задан:
+SELECT to_char(now(), 'YYYYMMDD') today \gset
+\set log_file '/home/gpadmin/gpAdminLogs/kill_hung_query_':today'.log'
+
+-- Если пользователем задан лог-файл (переменная log),
+-- то присвоим переменной log_file значение переменной log:
+\set orig_log :log
+\set log  NULL:log
+SELECT CASE
+         WHEN what.log = 'NULL'
+           OR what.log = 'NULL:log'
+              THEN :'log_file'
+         ELSE      :'orig_log'
+       END AS log_file
+  FROM (SELECT :'log' log) what
+\gset
+
+-- сформировать строку с командой записи в лог-файл:
+\set save_to_log_file '\\out | tee -a ':log_file
+-- включает запись в лог-файл:
+:save_to_log_file
+
+\qecho --- Начало работы :app_name ---
+SELECT clock_timestamp();
+\qecho PID psql-процесса:
+\qecho :psql_pid
+\qecho Строка команды psql:
+\qecho :psql_command
+\qecho Информация о соединении:
+\conninfo
+\pset tuples_only off
+\pset format aligned
+\x \\
+SELECT * FROM pg_stat_activity WHERE pid = pg_backend_pid();
+\x
+\qecho Работа скрипта записывается в лог-файл:
+\qecho :log_file
+
+
+-- ПРОВЕРКА signal, выбор функции
+-- проверка на то, что задана переменная signal:
+-- если ничего не задано, то сигнал будет SIGTERM
+\set signal SIGTERM:signal
+
+SELECT CASE what.signal
+         WHEN 'SIGTERMSIGINT' THEN 'pg_cancel_backend'
+         ELSE 'pg_terminate_backend'
+       END AS kill_function 
+  FROM (SELECT :'signal' signal) what
+\gset
+
+\qecho Вызываем для sess_id = :sess_id функцию: :kill_function()
+
+
+
+
+-- ОСНОВНАЯ РАБОТА СКРИПТА
 -- создаём представление, чтобы можно было её использовать повторно.
--- CTE собирает с сегментов номера pid процессов запроса
+-- Запрос собирает с сегментов номера pid процессов запроса
 -- по общему sess_id с мастера.
 -- собираем "pons" - pids on segments
 CREATE OR REPLACE TEMP VIEW pids_view AS 
@@ -57,6 +155,7 @@ SELECT psga.gp_segment_id AS segment_id,
  WHERE psga.sess_id = :sess_to_kill
 ;
 
+
 -- Создаём временную таблицу.
 -- Таблицу необходимо распределять по REPLICATED.
 -- Сделано так для выполнения gp_dist_random() на сегментах.
@@ -65,25 +164,26 @@ SELECT psga.gp_segment_id AS segment_id,
 CREATE TEMP TABLE pids_tmp AS SELECT * FROM pids_view
   DISTRIBUTED REPLICATED;
 
-\echo  Список сегментов, pid и номер сессии по данному запросу:
+
+\qecho  Проверяем процессы с sess_id = :sess_id:
 SELECT * FROM pids_tmp;
 
 
--- Здесь я специально разделил отключение на сегментах
+-- Специально разделено отключение на сегментах
 -- и отключение на мастере.
--- По идее это можно связать одним запросом через
--- UNION ALL
-\echo  отключаем бэкенды на сегментах:
+-- Сперва происходит отключение на сегментах.
+\qecho  Отключаем на сегментах процессы с sess_id = :sess_id:
 SELECT gdr.gp_segment_id   gdr_seg,
        pids_tmp.segment_id pons_seg,
        (:kill_function (
            pids_tmp.pid, 
            (
-            'sent on pid = '  ||
-             pids_tmp.pid     ||
-            ', sess_id = '    ||
-             pids_tmp.sess_id ||
-            ', gpseg = '      ||
+            'sent signal '       || :'kill_function' ||
+            '() from '           || :'app_name'      || ' on pid = ' ||
+             pids_tmp.pid        ||
+            ', sess_id = '       ||
+             pids_tmp.sess_id    ||
+            ', gpseg = '         ||
              pids_tmp.segment_id
            )
          )
@@ -96,33 +196,34 @@ SELECT gdr.gp_segment_id   gdr_seg,
 ;
 
 
--- Паузу в 3 секунды я сделал потому, что
--- иногда данные для pids_view не успевали обновляться
-\echo  Пауза 3 секунды:
+-- Пауза необходимо, для обеспечения синхронизации статистики.
+-- То есть, чтобы статистика успела дойти с сегментов до мастера.
+\qecho  Пауза 3 секунды:
 SELECT pg_sleep(3);
-\echo  Проверяем через pids_view:
+
+\qecho  Проверяем на сегментах процессы с sess_id = :sess_id:
 SELECT * FROM pids_view;
 
-\echo  Отключаем бэкенд на мастере:
+\qecho  Отключаем на мастере процесс с sess_id = :sess_id:
 SELECT (:kill_function (
            pid, 
            (
-            'sent pid = '  ||
-             pid           ||
-            ', sess_id = ' ||
-             sess_id       ||
+            'sent signal '       || :'kill_function' ||
+            '() from '           || :'app_name'      || ' on pid = ' ||
+             pid                 ||
+            ', sess_id = '       ||
+             sess_id             ||
             ', gpseg = -1'
            )
          )
        )
   FROM pg_stat_activity
  WHERE sess_id = :sess_to_kill;
-\echo  Проверяем через pids_view:
+\qecho  Проверяем через pids_view:
 SELECT * FROM pids_view;
 
 
--- Эти запросы на случай, если зависшие процессы не прекратятся
-\echo  hung pids:
+\qecho  Проверяем процессы с sess_id = :sess_id:
 SELECT content segment_No, address, pid
   FROM gp_segment_configuration gsc
   JOIN pids_view pv
@@ -132,47 +233,6 @@ SELECT content segment_No, address, pid
 ;
 
 
--- выключение логирования:
--- \o
--- выходим:
+\qecho --- Завершение работы :app_name ---
+\o
 \q
-
-
-
-\quit
--- Данные действия ниже не являются рекомендуемыми!
--- Не рекомендуется - потому что используется pg_ctl
--- Для таких действий разработчикам ADB
--- нужно разработать обёртку, которая бы логировала эти действия
--- в лог СУБД и в /home/gpadmin/gpAdminLogs
--- и возможно выполняла какие-нибудь проверки
-
--- В данном случае реализуется та идея, что
--- лучше заставить рестартовать отдельные сегменты,
--- чем весь кластер СУБД целиком
-
--- Действия такие:
--- Если функция pg_terminate_backend() не поможет,
--- то SQL-скрипт предлагает список pid и примеры команд gpssh
--- которые необходимо выполнить на мастере.
-
--- Если дочерний процесс postgres зависнет,
--- то он может не позволить процессу postmaster
--- выполнить рестарт через pg_ctl в режиме fast
-
-
-\echo  Если pg_terminate_backend() (SIGTERM) не поможет,
-\echo  то придётся делать pg_ctl -m immediate restart.
-\a
-SELECT 'gpssh -h '||address||' ''$GPHOME/bin/pg_ctl -D '||datadir||' -m immediate -o "-D '||datadir||' -p '||port||'" stop'''
-    AS "shell command examples:"
-  FROM gp_segment_configuration gsc
-  JOIN pids_view pv
-    ON gsc.content = pv.segment_id
- WHERE role = 'p'
- ORDER BY address, content
-;
-\a
-\q
-
-
