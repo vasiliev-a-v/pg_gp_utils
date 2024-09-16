@@ -1,6 +1,5 @@
 -- kill_hung_query.sql
 
--- https://github.com/vasiliev-a-v/pg_gp_utils/blob/main/useful_scripts/hung_query/kill_hung_query.sql
 
 -- psql-скрипт, который прекращает распределённый SQL-запрос
 -- в виде объединённых общим sess_id процессов на мастере и сегментах.
@@ -226,9 +225,9 @@ SELECT (:kill_function (
        )
   FROM pg_stat_activity
  WHERE sess_id = :sess_to_kill;
-
 \qecho  Проверяем через pids_view:
 SELECT * FROM pids_view;
+
 
 \qecho  Проверяем процессы с sess_id = :sess_id:
 SELECT content segment_No, address, pid
