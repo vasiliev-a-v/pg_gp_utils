@@ -26,6 +26,7 @@ WITH pids AS (
    WHERE psga.sess_id = pids.sess_id
    ORDER BY psga.sess_id, psga.gp_segment_id
 ;
+
 SELECT pg_sleep(10000);
 COMMIT;
 \q
