@@ -4,6 +4,8 @@
 --~ \prompt table_name
 -- партиционированная таблица:
 \set table_name ao_delivery_times.delivery_times_rows
+\c adb
+\set table_name adbmon.t_audit_top
 -- непартиционированная таблица:
 --~ \set table_name pg_catalog.pg_class
 

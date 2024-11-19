@@ -13,6 +13,8 @@ WITH pids AS (
   SELECT psga.gp_segment_id,
          psga.pid,
          psga.sess_id,
+         rsgid,
+         rsgname,
          substring(psga.query, 1, 100)
     FROM (
          SELECT -1 AS gp_segment_id,
