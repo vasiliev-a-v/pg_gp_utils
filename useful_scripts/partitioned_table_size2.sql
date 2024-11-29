@@ -1,5 +1,6 @@
 \c ADWH
 -- Подставьте имя вашей партиционированной таблицы вместо 'schema_name.partitioned_table_name'
+-- Один из вариантов подсчёта размера партиционированной таблицы
 --~ \prompt table_name
 --~ \set table_name pg_catalog.pg_class
 \set table_name ao_delivery_times.delivery_times_rows

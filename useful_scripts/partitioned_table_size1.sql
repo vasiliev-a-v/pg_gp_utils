@@ -1,9 +1,11 @@
-\c ADWH
+-- \c ADWH
+\c adb
 -- Подставьте имя вашей партиционированной таблицы вместо 'schema_name.partitioned_table_name'
 -- Скрипт корректно считает размер как партиционированной, так и непартиционированной таблицы
 --~ \prompt table_name
 -- партиционированная таблица:
 \set table_name ao_delivery_times.delivery_times_rows
+\set table_name inc0022083.t_audit_top
 -- непартиционированная таблица:
 --~ \set table_name pg_catalog.pg_class
 
@@ -38,5 +40,4 @@ WITH t1 AS (
    ORDER BY table_name
 ;
 \q
-
 
