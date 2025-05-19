@@ -54,8 +54,8 @@ def get_sql_query():
         JOIN pg_catalog.pg_class cl ON
             bdirelid = cl.oid
         WHERE
-            CAST(bdirelpages AS NUMERIC(12,0)) * 32 / 1024 > 100
-            AND relpersistence = 'p'
+            relpersistence = 'p' 
+            -- AND CAST(bdirelpages AS NUMERIC(12,0)) * 32 / 1024 > 100 -- if needed filter tables size MB
         ORDER BY
             bdirelpages DESC;
     """
