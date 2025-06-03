@@ -1,17 +1,16 @@
+-- \c postgres
 
--- \c your_database
--- \c inc0022051
-
--- эта переменная должна прийти сюда при вызове SQL-скрипта
+-- эти переменные должны прийти сюда при вызове SQL-скрипта
 -- \set date 20241108
+-- \set gp_schema inc0022051
+
+SET search_path TO :gp_schema,public;
 
 \set tables_date   tables_:date
 \set starts_date   starts_:date
 \set stops_date    stops_:date
 \set analysis_date analysis_:date
 \set results_date  results_:date
-
-
 
 -- Таблица с результатами резервного копирования:
 \qecho создаём таблицу с результатами РК: :results_date

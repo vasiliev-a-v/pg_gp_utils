@@ -1,12 +1,9 @@
-\c postgres
+-- \c postgres
 
+-- эти переменные должны прийти сюда при вызове SQL-скрипта
+-- \set date 20241108
+-- \set gp_schema inc0022051
 
-SELECT gp_segment_id, current_catalog FROM gp_dist_random('gp_id');
-\quit
-
-
-\set gp_schema inc0022051
-\set date 20241108
 SET search_path TO :gp_schema,public;
 
 \set tables_date   tables_:date
@@ -14,11 +11,6 @@ SET search_path TO :gp_schema,public;
 \set stops_date    stops_:date
 \set analysis_date analysis_:date
 \set results_date  results_:date
-
-
-
-\quit
-
 
 -- Таблица с результатами резервного копирования:
 \qecho создаём таблицу с результатами РК: :results_date
@@ -224,4 +216,6 @@ WITH
   DISTRIBUTED BY (oid)
 ;
 
+
+\dt+
 

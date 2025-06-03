@@ -1,3 +1,5 @@
+
+
 -- Based on ticket: INC0020873
 -- Search hung SQL-queries: 
 -- Hung queries are - queries, which have no process on master.
@@ -26,8 +28,8 @@ CREATE TEMP TABLE segment_sessions AS
   DISTRIBUTED BY (sess_id);
 
 -- Отобразить зависшие сессии и их query
-SELECT segment_sessions.sess_id,
-       segment_sessions.query
+SELECT segment_sessions.sess_id --,
+       -- segment_sessions.query
   FROM (
         -- Вычисляются сессии,
         -- которые есть на сегментах,

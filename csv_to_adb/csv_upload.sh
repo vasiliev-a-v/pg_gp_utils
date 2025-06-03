@@ -12,11 +12,15 @@
 
 # /p/csv_to_adb/csv_upload.sh --path /a/INC/INC0020472/dia_res/arenadata_toolkit.db_files_current.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0020472 --schema arenadata_toolkit --table db_files_current1
 
+# csv_upload.sh --path /a/INC/INC0024504/pg_aocsseg_436855222.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0024504 --table pg_aocsseg_436855222 --template template_pg_aocsseg.sql
+
 # EXAMPLES:
-# csv_upload.sh --file check_data_skew_to_csv.csv.gz --path /a/INC/INC0019547 --host avas-dwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket inc0019547 --table check_data_skew_to_csv --template template_check_data_skew.sql
+# csv_upload.sh --path /a/INC/INC0019547/check_data_skew_to_csv.csv.gz --host avas-dwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket inc0019547 --table check_data_skew_to_csv --template template_check_data_skew.sql
 # scp -r /p/csv_to_adb/ avas@avas-cdwm1:/tmp
 
-#~ csv_upload.sh --path /a/INC/INC0020472/1 --file pg_stat_all_tables.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0020472 --table pg_stat_all_tables --template template_pg_stat_all_tables_all_cluster.sql
+#~ csv_upload.sh --path /a/INC/INC0020472/1/pg_stat_all_tables.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0020472 --table pg_stat_all_tables --template template_pg_stat_all_tables_all_cluster.sql
+
+#~ csv_upload.sh --path /a/INC/INC0022604/tat1700-1705.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0022604 --table t_audit_top --template template_t_audit_top.sql
 
 ## Defining global variables ---------------------------------------- ##
 
@@ -130,7 +134,6 @@ func_get_arguments() {  # write argues from CLI into variables
   # additional conversions:
   ticket="$(echo $ticket | tr [:upper:] [:lower:])"
   dbname=$ticket
-
   file="$(basename ${path})"
 
   # undefined variables:
@@ -147,6 +150,10 @@ func_upload() {  #~ upload to ADB cluster
 func_csv_to_adb() {  #~ csv to ADB
   # if csv_to_adb procedure is not defined, then go out from function:
   [[ $csv_to_adb == "" ]] && return 0
+
+  # Upload csv_to_adb script:
+  echo "Upload csv_to_adb script onto $host cluster:"
+  scp -r $current_path $user@$host:/tmp
   echo "bash ${csv_to_adb} --ticket $ticket --file $file --schema $schema --table $table --template $template" | ssh -C $user@$host sudo -iu gpadmin
 }
 

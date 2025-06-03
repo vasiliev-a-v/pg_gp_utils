@@ -1,11 +1,13 @@
-\c ADWH
 -- Подставьте имя вашей партиционированной таблицы вместо 'schema_name.partitioned_table_name'
 -- Скрипт корректно считает размер как партиционированной, так и непартиционированной таблицы
 --~ \prompt table_name
 -- партиционированная таблица:
-\set table_name ao_delivery_times.delivery_times_rows
-\c adb
-\set table_name adbmon.t_audit_top
+-- \c ADWH
+-- \set table_name ao_delivery_times.delivery_times_rows
+-- \c adb
+-- \set table_name adbmon.t_audit_top
+\c gpadmin
+\set table_name public.t1
 -- непартиционированная таблица:
 --~ \set table_name pg_catalog.pg_class
 

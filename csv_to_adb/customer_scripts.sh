@@ -47,6 +47,17 @@ ls -lh /tmp/$table.csv.gz
 
 # arenadata_toolkit.db_files_history
 table="arenadata_toolkit.db_files_history"
+dbname="adb"
+psql -q -d $dbname -c "COPY (
+  SELECT *
+    FROM $table
+) TO '/tmp/$table.csv' (FORMAT CSV, HEADER)"
+gzip --force /tmp/$table.csv
+chmod 0666   /tmp/$table.csv.gz
+ls -lh       /tmp/$table.csv.gz
+
+# arenadata_toolkit.db_files_history для конкретной таблицы
+table="arenadata_toolkit.db_files_history"
 dbname="ADWH"
 psql -q -d $dbname -c "COPY (
   SELECT *
@@ -192,12 +203,6 @@ ls -lh /tmp/$table.csv.gz
 
 select * from adbmon.t_audit_top where 1 = 1 and dtm between '2024-04-22 14:00:00 +0300' and '2024-04-23 00:00:00 +0300';
 select * from adbmon.t_audit_pg_stat_activity where 1 = 1 and dtm between '2024-04-22 14:00:00 +0300' and '2024-04-23 00:00:00 +0300';
-
-
-
-
-
-
 
 
 

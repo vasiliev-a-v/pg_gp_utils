@@ -2,11 +2,10 @@
 # скрипт:
 # - запускает vacuumdb с параметром verbose
 # - записывает в журнал каждый шаг, выставляя точное время ОС
-#~ TODO: проверить как без table
 
 ## Defining global variables ---------------------------------------- ##
 
-script_version=0.2                    # script version
+script_version=0.3                    # script version
 script=$(readlink -f $0)              # full path to script
 current_path=$(dirname $script)       # directory where scrit is located
 module="$(basename $script)"          # scripts file name
@@ -22,7 +21,7 @@ work_dir=/home/gpadmin/gpAdminLogs
 
 func_main() {         # main function
   func_get_arguments  # writes argues from CLI into variables
-  func_make_vacuum
+  func_make_vacuum    # executes vacuum
 }
 
 
@@ -36,13 +35,14 @@ func_show_help(){  # shows using help:
                  in format: schema.table              - $table
     
     --work_dir - path to directory for log file       - $work_dir
+                 by default: standart log directory for GP utilites.
     --version  - current version                      - $script_version
     --help     - show this help
 
     Example:
-    $module --dbname $dbname --work_dir $work_dir
+    $module --dbname $dbname
     # make vacuum for particular table
-    $module --dbname $dbname --table $table --work_dir $work_dir
+    $module --dbname $dbname --table $table
   "
   exit 0
 }
@@ -85,17 +85,21 @@ func_make_vacuum() {  # executes vacuum
     v_path=/usr/lib/gpdb/bin/vacuumdb
   fi
 
+  # log_file_name="${work_dir}/vacuumdb_${dbname}${t_in_log}_$(date +%Y%m%d).log"
+  log_file_name="${work_dir}/vacuumdb_$(date +%Y%m%d).log"
+  echo "tail -f $log_file_name"
+
 echo "$(date '+%Y-%m-%d %H:%M:%S.%N') - START: $script ${argv[*]}" >> \
-  $work_dir/vacuumdb.$dbname$t_in_log.log
+  $log_file_name
 
   $v_path --dbname=$dbname $t_argue --echo --verbose 2>&1 | \
     while read line; do
       echo "$(date '+%Y-%m-%d %H:%M:%S.%N') - $line" >> \
-        $work_dir/vacuumdb.$dbname$t_in_log.log
+        $log_file_name
     done
 
 echo "$(date '+%Y-%m-%d %H:%M:%S.%N') - END: $script ${argv[*]}
-" >> $work_dir/vacuumdb.$dbname$t_in_log.log
+" >> $log_file_name
 }
 
 
