@@ -8,7 +8,7 @@ DECLARE
 BEGIN
     FOR rec IN EXECUTE '
       SELECT gp_segment_id, * FROM ' || table_name || '
-      UNION ALL
+       UNION ALL
       SELECT gp_segment_id, *
         FROM gp_dist_random(' || quote_literal(table_name) || ')
        ORDER BY gp_segment_id;'
