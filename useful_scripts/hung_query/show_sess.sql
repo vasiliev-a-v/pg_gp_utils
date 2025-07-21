@@ -22,7 +22,7 @@ SELECT psga.gp_segment_id AS gpseg,
               (pg_stat_get_activity(NULL::integer)).*
          FROM gp_dist_random('gp_id')
        ) psga
-c  JOIN pg_catalog.gp_segment_configuration gsc
+  JOIN pg_catalog.gp_segment_configuration gsc
     ON psga.gp_segment_id = gsc.content
  WHERE psga.sess_id = :sess_id
    AND gsc.role = 'p'

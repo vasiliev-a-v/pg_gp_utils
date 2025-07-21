@@ -10,8 +10,29 @@
 -- TODO: поменять поля в таблице arenadata_toolkit.wal_history на нормальные
 -- TODO: написать обработку, когда с get_wal.sh возникают ошибки
 --       например, скрипт не может подключиться к СУБД
+
 \c adb
 SET gp_resource_group_bypass = on;
+
+-- Просто запрос к таблице статистики WAL:
+SELECT *
+  FROM arenadata_toolkit.wal_history
+ ORDER BY dtm DESC, gpseg ASC
+LIMIT 5;
+\quit
+
+
+-- Текущий список файлов в каталоге pg_xlog:
+SELECT -1 AS gpseg,
+       pg_ls_dir('pg_xlog')
+ UNION ALL
+SELECT gp_segment_id AS gpseg,
+       pg_ls_dir('pg_xlog')
+  FROM gp_dist_random('gp_id')
+ ORDER BY gpseg
+;
+\quit
+
 
 -- SELECT * FROM pg_proc WHERE proname ~ 'pg_ls';
 -- \quit
@@ -31,18 +52,12 @@ CREATE TEMP TABLE IF NOT EXISTS temp_t (
   DISTRIBUTED BY (gpseg)
 ;
 
-\dn+ pg_temp_*.*
+-- \dn+ pg_temp_*.*
 
 
+SELECT * FROM arenadata_toolkit.wal_history ORDER BY dtm DESC LIMIT 1;
 \quit
 
-SELECT * FROM pg_stat_activity;
-
-
--- SELECT pg_ls_dir(current_setting('data_directory') || '/pg_xlog');
-\quit
-
--- SELECT * FROM arenadata_toolkit.wal_history ORDER BY dtm DESC LIMIT 1;
 
 WITH w_start  AS (
        SELECT *

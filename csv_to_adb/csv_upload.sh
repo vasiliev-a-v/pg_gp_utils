@@ -10,6 +10,8 @@
 #~ TODO: отработать все известные шаблоны
 #~ TODO: подготовить шаблоны загрузки для заказчика
 
+# /p/pg_gp_utils/csv_to_adb/csv_upload.sh --path /a/INC/INC0024946/INC0024946/tat1.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0024946 --schema public --table t_audit_top  --template template_t_audit_top.sql
+
 # /p/csv_to_adb/csv_upload.sh --path /a/INC/INC0020472/dia_res/arenadata_toolkit.db_files_current.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0020472 --schema arenadata_toolkit --table db_files_current1
 
 # csv_upload.sh --path /a/INC/INC0024504/pg_aocsseg_436855222.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0024504 --table pg_aocsseg_436855222 --template template_pg_aocsseg.sql

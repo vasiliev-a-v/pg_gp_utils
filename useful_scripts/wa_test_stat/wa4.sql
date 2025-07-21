@@ -1,4 +1,28 @@
- \c test_vacuum_oom
+
+
+-- \dt 
+-- \quit
+
+SELECT gp_segment_id, count()
+  FROM public.test_ao_table
+ GROUP BY gp_segment_id
+ ORDER BY gp_segment_id
+;
+
+SELECT *
+  FROM gp_toolkit.gp_skew_coefficients
+ WHERE skcnamespace = 'public'
+   AND skcrelname = 'test_ao_table'
+;
+
+SELECT * FROM gp_toolkit.gp_skew_idle_fractions
+ WHERE sifnamespace = 'public'
+   AND sifrelname = 'test_ao_table'
+;
+
+
+\quit
+
 
 
 CREATE OR REPLACE FUNCTION dynamic_gp_dist_random(table_name text)

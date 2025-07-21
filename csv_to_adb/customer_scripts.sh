@@ -31,15 +31,15 @@ table="pg_statio_sys_tables"
 
 # gp_segment_configuration
 table="gp_segment_configuration"
-dbname="adb"
-psql -q -d $dbname -c "COPY (SELECT * FROM $table) TO '/tmp/$table.csv' (FORMAT CSV, HEADER)"
+dbname="template1"
+psql -q -d $dbname -c "COPY (SELECT * FROM $table) TO PROGRAM 'gzip -f > /tmp/$table.csv' (FORMAT CSV, HEADER)"
 gzip /tmp/$table.csv
 chmod 0666 /tmp/$table.csv.gz
 ls -lh /tmp/$table.csv.gz
 
 # gp_configuration_history
 table="gp_configuration_history"
-dbname="adb"
+dbname="template1"
 psql -q -d $dbname -c "COPY (SELECT * FROM $table) TO '/tmp/$table.csv' (FORMAT CSV, HEADER)"
 gzip /tmp/$table.csv
 chmod 0666 /tmp/$table.csv.gz
