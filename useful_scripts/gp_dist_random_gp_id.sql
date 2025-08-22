@@ -1,6 +1,5 @@
 \c ADWH
 
-
 SELECT gp_segment_id, (row).*
   FROM (
   SELECT gp_segment_id,

@@ -11,3 +11,7 @@ CREATE TABLE IF NOT EXISTS public.$table (
        )
   DISTRIBUTED RANDOMLY
 ;
+
+
+-- \quit
+-- pg_dump --schema-only -d template1 -t gp_toolkit.gp_resgroup_status -f /tmp/gp_toolkit.gp_resgroup_status.dll.dump

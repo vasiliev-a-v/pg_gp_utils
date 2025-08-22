@@ -1,1 +1,0 @@
-/p/template_logs/template_logs1.sh

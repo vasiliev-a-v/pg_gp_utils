@@ -87,13 +87,25 @@ chmod 0666 /tmp/$table.csv.gz
 ls -lh /tmp/$table.csv.gz
 
 # --- расширенный вариант для pg_stat_all_tables со всех нод:
+# TODO: ПЕРЕПИСАТЬ ЗАПРОС:
 table="pg_stat_all_tables"
 dbname="ADWH"
-psql -q -d $dbname -c "COPY (
-SELECT * FROM pg_stat_user_tables WHERE schemaname = 'ao_delivery_times' AND relname = 'delivery_times_rows'
-UNION ALL
-SELECT * FROM gp_dist_random('pg_stat_user_tables') WHERE schemaname = 'ao_delivery_times' AND relname = 'delivery_times_rows'
+psql -q -d $dbname -c "
+COPY (
+      SELECT gp_execution_segment(), *
+        FROM pg_stat_user_tables
+       WHERE 1 = 1
+         AND schemaname = 'ao_delivery_times'
+         AND relname = 'delivery_times_rows'
+       UNION ALL
+      SELECT gp_execution_segment(), *
+        FROM gp_dist_random('pg_stat_user_tables')
+       WHERE 1 = 1
+         AND schemaname = 'ao_delivery_times'
+         AND relname = 'delivery_times_rows'
+       ORDER BY 1
 ) TO '/tmp/$table.csv' (FORMAT CSV, HEADER)"
+
 gzip /tmp/$table.csv
 chmod 0666 /tmp/$table.csv.gz
 ls -lh /tmp/$table.csv.gz

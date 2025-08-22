@@ -3,26 +3,12 @@
 # First part of csv to ADB scripts.
 # This script uploads csv table to ADB cluster
 
-#~ TODO: сделать опцию, чтобы можно было сразу удалить csv и csv.gz файл
 #~ TODO: проверить загрузку db_files_current, db_files_history
 #~ TODO: проверить новый синтаксис csv_to_adb.sh без опций table и так далее.
 #~ TODO: проверить gp_toolkit.gp_resgroup_config (таблицы с точкой)
 #~ TODO: отработать все известные шаблоны
 #~ TODO: подготовить шаблоны загрузки для заказчика
 
-# /p/pg_gp_utils/csv_to_adb/csv_upload.sh --path /a/INC/INC0024946/INC0024946/tat1.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0024946 --schema public --table t_audit_top  --template template_t_audit_top.sql
-
-# /p/csv_to_adb/csv_upload.sh --path /a/INC/INC0020472/dia_res/arenadata_toolkit.db_files_current.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0020472 --schema arenadata_toolkit --table db_files_current1
-
-# csv_upload.sh --path /a/INC/INC0024504/pg_aocsseg_436855222.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0024504 --table pg_aocsseg_436855222 --template template_pg_aocsseg.sql
-
-# EXAMPLES:
-# csv_upload.sh --path /a/INC/INC0019547/check_data_skew_to_csv.csv.gz --host avas-dwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket inc0019547 --table check_data_skew_to_csv --template template_check_data_skew.sql
-# scp -r /p/csv_to_adb/ avas@avas-cdwm1:/tmp
-
-#~ csv_upload.sh --path /a/INC/INC0020472/1/pg_stat_all_tables.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0020472 --table pg_stat_all_tables --template template_pg_stat_all_tables_all_cluster.sql
-
-#~ csv_upload.sh --path /a/INC/INC0022604/tat1700-1705.csv.gz --host avas-cdwm1 --user avas --csv_to_adb /tmp/csv_to_adb/csv_to_adb.sh --ticket INC0022604 --table t_audit_top --template template_t_audit_top.sql
 
 ## Defining global variables ---------------------------------------- ##
 
@@ -51,8 +37,9 @@ schema=pg_catalog
 
 func_main() {  #~ main function
   func_get_arguments
-  func_upload
-  func_csv_to_adb
+  # func_upload
+  # func_csv_to_adb
+  func_remove_csv
 }
 
 
@@ -158,6 +145,17 @@ func_csv_to_adb() {  #~ csv to ADB
   scp -r $current_path $user@$host:/tmp
   echo "bash ${csv_to_adb} --ticket $ticket --file $file --schema $schema --table $table --template $template" | ssh -C $user@$host sudo -iu gpadmin
 }
+
+
+func_remove_csv() {  # delete csv file after uploading
+  if echo $file | grep ".gz"; then
+    f_csv=${file%".gz"}
+  fi
+  echo "Удаляем загруженный файл."
+  ssh -C $user@$host "echo "До удаления:"; ls -1 /tmp/$f_csv; rm -f /tmp/$f_csv; echo "После удаления:"; ls -1 /tmp/$f_csv"
+}
+
+
 
 
 func_main

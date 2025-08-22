@@ -3,6 +3,24 @@
 # - запускает vacuumdb с параметром verbose
 # - записывает в журнал каждый шаг, выставляя точное время ОС
 
+
+# TODO: хотел переписать скрипт с использованием psql вместо vacuumdb.
+# TODO: при этом добавить опции 
+# SET debug_appendonly_print_compaction = on;
+# SET debug_appendonly_print_segfile_choice = on;
+# TODO: добавить опционально gplogfilter для сбора лога о вакууме
+# ```
+# dbname=gpadmin
+# table=public.test_ao_table
+# b=$(date '+%Y-%m-%dT%H:%M')
+# echo "SET debug_appendonly_print_compaction = on; SET debug_appendonly_print_segfile_choice = on; SELECT now() VACUUM_BEGIN; VACUUM (VERBOSE) $table; SELECT now() VACUUM_END" | psql -d $dbname -U gpadmin --echo-queries 2>&1 | tee > /tmp/vacuum_debug.log
+# e=$(date -d '+1 minute' '+%Y-%m-%dT%H:%M')
+# gplogfilter -b $b -e $e -o /tmp/vacuum_debug_pg_log.csv.gz $MASTER_DATA_DIRECTORY/pg_log/gpdb-$(date '+%Y-%m-%d')*
+# ```
+
+
+
+
 ## Defining global variables ---------------------------------------- ##
 
 script_version=0.4                    # script version
@@ -86,12 +104,13 @@ func_make_vacuum() {  # executes vacuum
     v_path=/usr/lib/gpdb/bin/vacuumdb
   fi
 
+    
   # log_file_name="${work_dir}/vacuumdb_${dbname}${t_in_log}_$(date +%Y%m%d).log"
   log_file_name="${work_dir}/vacuumdb_$(date +%Y%m%d).log"
   echo "tail -f $log_file_name"
 
-echo "$(date '+%Y-%m-%d %H:%M:%S.%N') - START: $script ${argv[*]}" >> \
-  $log_file_name
+  echo "$(date '+%Y-%m-%d %H:%M:%S.%N') - START: $script ${argv[*]}" >> \
+    $log_file_name
 
   $v_path --dbname=$dbname $t_argue --echo --verbose 2>&1 | \
     while read line; do
@@ -99,8 +118,8 @@ echo "$(date '+%Y-%m-%d %H:%M:%S.%N') - START: $script ${argv[*]}" >> \
         $log_file_name
     done
 
-echo "$(date '+%Y-%m-%d %H:%M:%S.%N') - END: $script ${argv[*]}
-" >> $log_file_name
+  echo "$(date '+%Y-%m-%d %H:%M:%S.%N') - END: $script ${argv[*]}
+  " >> $log_file_name
 }
 
 

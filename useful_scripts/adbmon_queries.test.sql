@@ -7,20 +7,29 @@
 -- psql -d ваша_база -f /home/gpadmin/arenadata_configs/adbmon_queries.sql -v begin 'YYYY-MM-DD HH:mm:SS' -v end='YYYY-MM-DD HH:mm:SS'
 -- Например:
 -- psql -d adb -f /home/gpadmin/arenadata_configs/adbmon_queries.sql -v begin '2024-03-26 11:03:00 +0300' -v end='2024-03-26 11:06:00 +0300'
-
--- psql -d ваша_база -f /home/gpadmin/arenadata_configs/adbmon_queries.sql -v begin '2025-07-16 11:00' -v end='2025-07-16 13:00' 2>&1 | tee /tmp/adbmon_queries.log
-
 -- Сформируются CSV-файлы.
 -- TODO: сделать опционально включить возможность собрать t_audit_top
 
+-- -- -- -- ЭТО ТЕСТ! --
+
+\c inc0025341
 
 SET optimizer = off;
 SELECT to_char(now(), 'YYYY-MM-DD_HH24-MI-SS') date \gset
 
 
+-- Тестировал $(hostname) в имени файла
+-- COPY (SELECT * FROM public.t_audit_top
+       -- WHERE 1 = 1
+         -- AND dtm BETWEEN '2025-07-18 10:08:00 +0300'
+                     -- AND '2025-07-18 10:35:00 +0300'
+   -- ) TO PROGRAM 'gzip -f > /tmp/ta_top_$(hostname).csv.gz' (FORMAT CSV, HEADER);
+-- \quit
+
+
 -- Объявить переменные для названий файлов:
 \set fn_ta_top                        /tmp/ta_top_ :date .csv.gz
-\set fn_ta_pg_stat_activity           /tmp/ta_pg_stat_activity_ :date .csv.gz
+\set fn_ta_pg_stat_activity           /tmp/ta_pg_stat_activity_$(hostname)_ :date .csv.gz
 \set fn_ta_gp_resgroup_status         /tmp/ta_gp_resgroup_status_ :date .csv.gz
 \set fn_ta_gp_resgroup_status_per_seg /tmp/ta_gp_resgroup_status_per_seg_ :date .csv.gz
 \set fn_ta_locks_usage                /tmp/ta_locks_usage_ :date .csv.gz
@@ -37,7 +46,7 @@ SELECT to_char(now(), 'YYYY-MM-DD_HH24-MI-SS') date \gset
 
 -- отключил потому, что он может собрать черезчур много данных.
 -- \qecho :fn_ta_top
--- COPY (SELECT * FROM adbmon.t_audit_top
+-- COPY (SELECT * FROM public.t_audit_top
        -- WHERE 1 = 1
          -- AND dtm BETWEEN :'begin'
                      -- AND :'end'
@@ -46,7 +55,7 @@ SELECT to_char(now(), 'YYYY-MM-DD_HH24-MI-SS') date \gset
 
 \qecho 
 \qecho :fn_ta_pg_stat_activity
-COPY (SELECT * FROM adbmon.t_audit_pg_stat_activity
+COPY (SELECT * FROM public.t_audit_pg_stat_activity
        WHERE 1 = 1
          AND dtm BETWEEN :'begin'
                      AND :'end'
@@ -54,7 +63,7 @@ COPY (SELECT * FROM adbmon.t_audit_pg_stat_activity
 ;
 \qecho 
 \qecho :fn_ta_gp_resgroup_status
-COPY (SELECT * FROM adbmon.t_audit_resgroup_status
+COPY (SELECT * FROM public.t_audit_resgroup_status
        WHERE 1 = 1
          AND dtm BETWEEN :'begin'
                      AND :'end'
@@ -62,7 +71,7 @@ COPY (SELECT * FROM adbmon.t_audit_resgroup_status
 ;
 \qecho 
 \qecho :fn_ta_gp_resgroup_status_per_seg
-COPY (SELECT * FROM adbmon.t_audit_resgroup_status_per_seg
+COPY (SELECT * FROM public.t_audit_resgroup_status_per_seg
        WHERE 1 = 1
          AND dtm BETWEEN :'begin'
                      AND :'end'
@@ -70,7 +79,7 @@ COPY (SELECT * FROM adbmon.t_audit_resgroup_status_per_seg
 ;
 \qecho 
 \qecho :fn_ta_locks_usage
-COPY (SELECT * FROM adbmon.t_audit_locks_usage
+COPY (SELECT * FROM public.t_audit_locks_usage
        WHERE 1 = 1
          AND dtm BETWEEN :'begin'
                      AND :'end'
@@ -78,7 +87,7 @@ COPY (SELECT * FROM adbmon.t_audit_locks_usage
 ;
 \qecho 
 \qecho :fn_ta_mem_usage
-COPY (SELECT * FROM adbmon.t_audit_mem_usage
+COPY (SELECT * FROM public.t_audit_mem_usage
        WHERE 1 = 1
          AND dtm BETWEEN :'begin'
                      AND :'end'
@@ -87,6 +96,7 @@ COPY (SELECT * FROM adbmon.t_audit_mem_usage
 
 \qecho 
 \qecho /tmp/adbmon_queries.log
+
 
 
 \quit

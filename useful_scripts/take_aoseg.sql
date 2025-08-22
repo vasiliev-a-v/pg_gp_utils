@@ -1,1 +1,0 @@
-/p/INC0016806/take_aoseg.sql

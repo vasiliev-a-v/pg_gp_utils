@@ -1,0 +1,19 @@
+  Program $module version: $script_version
+  Usage:                                            - Current setting:
+  -l, --log  - full path to log-filename            - $LOG_FILE
+               Default: ${current_dir}/${script_name}.log
+  -s, -start - start of date and time for getting pg_logs.
+               Timestamp should be in format:
+               YYYY-MM-DD_HH:MM
+               Without quotes and space character between date and time.
+  -e, -end   - end of date and time for getting pg_logs.
+               Timestamp should be in format:
+               YYYY-MM-DD_HH:MM
+               Without quotes and space character between date and time.
+  -d, -dbname - database name.
+
+  --version  - current version                      - $script_version
+  --help     - show this help
+
+  Example:
+  $script <tool> [<tool_options> ...] 

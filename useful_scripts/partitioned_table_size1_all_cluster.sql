@@ -7,9 +7,19 @@
 -- \c adb
 -- \set table_name adbmon.t_audit_top
 \c gpadmin
-\set table_name public.t1
--- непартиционированная таблица:
---~ \set table_name pg_catalog.pg_class
+
+-- SELECT relid::regclass, * FROM pg_appendonly;
+-- \quit
+
+\set table_name public.test_vacuum
+\set table_name public.test_ao_table
+-- \set table_name public.t1
+-- Заведомо непартиционированная таблица:
+-- \set table_name pg_catalog.pg_class
+
+\dt+ :table_name
+
+SELECT pg_total_relation_size(:'table_name');
 
 WITH t1 AS (
   SELECT n.nspname AS schema_name,
