@@ -198,45 +198,61 @@ func_debug_remote_probe() {  # быстрая проверка удалённо
 
 func_resolve_seg_host_and_path() {  ## Определение SEG_HOST и PG_LOG_PATH --- ##
   # ищем путь вида */<role>/gpseg<GPSEG>/pg_log
-  local cmd="find / -xdev \( -path /proc -o -path /sys -o -path /run -o -path /dev \) -prune -o -regextype posix-extended -regex '.*/(${ROLE})/gpseg(${GPSEG})/pg_log' -print 2>/dev/null"
+  local cmd="find / -xdev \( \
+    -path /proc -o -path /sys -o -path /run -o -path /dev \) \
+    -prune -o -regextype posix-extended \
+    -regex '.*/(${ROLE})/gpseg(${GPSEG})/pg_log' \
+    -print 2>/dev/null"
+
+  echo role=$ROLE
+  echo GPSEG=$GPSEG
+  echo all_hosts=${all_hosts}
 
   # берем первую найденную строку
   local line
-  line="$(gpssh -f "$all_hosts" "$cmd" 2>/dev/null | grep "/${ROLE}/gpseg${GPSEG}/pg_log" | head -n1 || true)"
+  line="$(gpssh -f "$all_hosts" "$cmd" 2>/dev/null | \
+                grep "/${ROLE}/gpseg${GPSEG}/pg_log" | head -n1 || true)"
 
-  # УБИРАЕМ CR/LF и лишние табы/пробелы
+  # убрать символы CR/LF и лишние табы/пробелы
   line="$(printf '%s' "$line" | tr -d '\r' )"
   line="${line//$'\t'/ }"
   line="${line%$'\n'}"
+  echo line=$line
 
-  # Формат gpssh: [host.name] /path/to/.../pg_log
-  SEG_HOST="$(sed -n 's/^\[\([^]]\+\)\].*/\1/p' <<<"$line")"
-  PG_LOG_PATH="$(awk '{print $2}' <<<"$line")"
+  # Usually gpssh format is: [host.name] /path/to/.../pg_log
+  # But sometimes format is: [ host.name] /path/to/.../pg_log
+  # SEG_HOST="$(sed -n 's/^\[\([^]]\+\)\].*/\1/p' <<<"$line")"
+  SEG_HOST="$(echo ${line} | \
+    sed -nE 's/^\[[[:space:]]*([^[:space:]]+)[[:space:]]*].*/\1/p')"
+  # PG_LOG_PATH="$(awk '{print $2}' <<<"$line")"
+  PG_LOG_PATH="$(echo ${line} | cut -d ']' -f 2 | tr -d ' ')"
+  echo SEG_HOST=$SEG_HOST
+  echo PG_LOG_PATH=$PG_LOG_PATH
 
   # ещё раз подчистим на всякий случай
   SEG_HOST="$(printf '%s' "$SEG_HOST" | tr -d '\r\n')"
   PG_LOG_PATH="$(printf '%s' "$PG_LOG_PATH" | tr -d '\r\n')"
 
   [[ -n "$SEG_HOST" && -n "$PG_LOG_PATH" ]] || { \
-      func_prt_err "Не удалось распарсить seg_host/PG_LOG_PATH из gpssh"
+      func_prt_err "Failed to parse seg_host/PG_LOG_PATH from gpssh out"
       exit 1
     }
 
-  func_prt_inf "Определены для скачивания:"
-  func_prt_inf "Хост: host=${SEG_HOST}"
-  func_prt_inf "Путь: pg_log_path=${PG_LOG_PATH}"
+  func_prt_inf "--- Defined for download ---"
+  func_prt_inf "HOST: host=${SEG_HOST}"
+  func_prt_inf "PATH: pg_log_path=${PG_LOG_PATH}"
 
   if ((DEBUG == 1)); then  # показать "HEX" пути, чтобы сразу видно было хвосты
     printf '%s - DEBUG: PG_LOG_PATH HEX: ' "$(func_log_ts)"
     printf '%s' "$PG_LOG_PATH" | od -An -t x1
     # Если и тут NO_DIR - значит путь ещё грязный
-    func_dbg "Проверяю доступность каталога на удалённом хосте"
+    func_dbg "Check directory availability on remote host"
     ssh "$SEG_HOST" "ls -ld -- '$PG_LOG_PATH' || echo 'NO_DIR'"
   fi
 }
 
 
-func_remote_scan_and_build_intervals() {  ## Сканирование файлов на удалённом хосте + интервалы - ##
+func_remote_scan_and_build_intervals() {  # Сканирование файлов на хосте по ssh
   local -a files_raw=()
   local -a entries=()
 

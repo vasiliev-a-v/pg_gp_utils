@@ -5,7 +5,7 @@
 
 ## Defining global variables ---------------------------------------- ##
 
-script_version=0.1                    # script version
+script_version=0.2                    # script version
 script=$(readlink -f $0)              # full path to script
 current_path=$(dirname $script)       # catalog where script is located
 module="$(basename $script)"          # scripts file name
@@ -107,16 +107,32 @@ func_check_arguments() {  # check correctness the choice of options
     func_parse_gpseg
   fi
 
-  # По умолчанию база данных определена как adb
-  if [[ $adbmon == "true" ]] || [[ $t_audit_top == "true" ]]; then
-      if [ -z "$dbname" ]; then
-          echo "ERROR: -dbname option is not defined"
-          echo "You need determine the database where adbmon schema is located."
-          exit 5
-      fi
-  fi
+  # По умолчанию база данных $dbname определена как adb
+  # if [[ $adbmon == "true" ]] || [[ $t_audit_top == "true" ]]; then
+      # if [ -z "$dbname" ]; then
+          # echo "ERROR: -dbname option is not defined"
+          # echo "You need determine the database where adbmon schema is located."
+          # exit 5
+      # fi
+  # fi
 
   func_start_end_validation  # $start and $end validation
+
+  if [[ ! -f $all_hosts ]]; then  # check all_hosts file validation
+    echo "ERROR: No such file, defined in -all-hosts option:"
+    echo "$all_hosts"
+    echo "HINT: define option -all-hosts <FILENAME>
+    Full path to a file listing all Arenadata DB cluster hostnames.
+    If the file is not specified, the default file is:
+    /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts"
+    if [ -f /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts ]; then
+      hostfile=/home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
+      echo "Your cluster has this file here:"
+      echo $hostfile
+    fi
+    exit 5
+  fi
+
 }
 
 
@@ -160,7 +176,9 @@ func_start_end_validation() {  # $start and $end validation
   for v in start end; do
     val=${!v}
     # if [[ $val =~ $fmt ]] && [[ $(date -d "${val/_/ }" '+%F_%T' 2>/dev/null) == "$val" ]]; then
-    if [[ $val =~ $fmt ]] && [[ $(date -d "${val/_/ }" '+%Y-%m-%d_%H:%M' 2>/dev/null) == "$val" ]]; then
+    if [[ $val =~ $fmt ]] && \
+       [[ $(date -d "${val/_/ }" '+%Y-%m-%d_%H:%M' 2>/dev/null) == "$val" ]];
+    then
       true  # format OK.
     else
       echo "Incorrect format: $v='$val'"
@@ -199,6 +217,21 @@ func_prepare() {  # prepare before getting data
     adbmt_dir="${adbmt_tmp}/$scrpt_fn/$start_date"
   fi
 
+  # check that current user is match the DBMS Cluster owner
+  if [[ $MASTER_DATA_DIRECTORY == "" ]]; then
+    echo "ERROR: variable \$MASTER_DATA_DIRECTORY is empty"
+    echo "The current user is: " $USER
+    echo "The DBMS user is: " $dbms_user
+    exit 42
+  fi
+  dbms_user=$(ls -ld $MASTER_DATA_DIRECTORY | awk '{print $3}')
+  if [[ $USER != $dbms_user ]]; then
+    echo "ERROR: The current user does not match the DBMS system owner user!"
+    echo "The current user is: " $USER
+    echo "The DBMS user is: " $dbms_user
+    exit 42
+  fi
+
   mkdir -p $adbmt_dir
   if [[ $? == 0 ]]; then
     echo "Directory for collected information: "$adbmt_dir
@@ -207,7 +240,7 @@ func_prepare() {  # prepare before getting data
     exit 127
   fi
 
-  touch $adbmt_dir/available_hosts.hosts && \
+  echo -n > $adbmt_dir/available_hosts.hosts && \
     echo "File created: $adbmt_dir/available_hosts.hosts"
 
   # if psql_exit_code is not zero - we have no connections to ADB.
@@ -706,4 +739,11 @@ func_pack_to_tar_gz() {  # pack diagnostic data to tar.gz archive
 func_main  # from this point script starts running
 exit 0
 
+
+
+2025-08-26 - version 0.2.: Added several checks:
+  - for strange clusters
+  - without -all-hosts
+  - check for the case when the script is started not under the ADB owner
+    (for example, under root).
 

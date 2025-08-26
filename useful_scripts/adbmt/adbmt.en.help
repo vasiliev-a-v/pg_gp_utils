@@ -1,19 +1,130 @@
-  Program $module version: $script_version
-  Usage:                                            - Current setting:
-  -l, --log  - full path to log-filename            - $LOG_FILE
-               Default: ${current_dir}/${script_name}.log
-  -s, -start - start of date and time for getting pg_logs.
-               Timestamp should be in format:
-               YYYY-MM-DD_HH:MM
-               Without quotes and space character between date and time.
-  -e, -end   - end of date and time for getting pg_logs.
-               Timestamp should be in format:
-               YYYY-MM-DD_HH:MM
-               Without quotes and space character between date and time.
-  -d, -dbname - database name.
+Programme: $module
+Version: $script_version
 
-  --version  - current version                      - $script_version
-  --help     - show this help
 
-  Example:
-  $script <tool> [<tool_options> ...] 
+*****************************************************
+USAGE:
+*****************************************************
+  $module <TOOL> [<TOOL_OPTIONS> ...]
+
+TOOL:
+  gp_log_collector
+    This is a tool for collecting logs and parameters,
+    necessary for DBMS diagnostics.
+    The gp_log_collector tool can be launched in one of three ways:
+      1. unloading DBMS message logs from the master.
+      2. unloading DBMS message logs from the segment: primary or mirror.
+      3. collecting diagnostic information.
+
+Some examples:
+1. Example for collecting DBMS message logs from the master:
+bash $script gp_log_collector -gpseg -1 -start 2015-11-25_09:00 -end 2015-11-25_18:00
+
+2. Example for collecting DBMS message logs from mirror segment No 2:
+bash $script gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end 2015-11-25_18:00
+
+3.1. Example of collecting diagnostic information:
+bash $script gp_log_collector
+
+3.2. Example of collecting diagnostic information from PXF:
+bash $script gp_log_collector -pxf
+
+
+*****************************************************
+TOOL OPTIONS:
+*****************************************************
+
+TOOL_OPTIONS:                                        - Current values:
+  -dir                                               - $adbmt_tmp
+    Path to the working directory where temporary files
+    will be placed during compilation, as well as the final tar.gz.
+    This directory should not have spaces characters in its name.
+
+  -log
+    Full path to the log file of this executable script.
+    By default, the path to the log is in the $module script location:
+    $LOG_FILE
+
+  -gpseg <Role_and_ID>
+    The segment to unload the DBMS message logs.
+    The Role_and_ID value must consist of:
+    1. the segment role: p - primary, m - mirror.
+    2. the segment number.
+    For example: primary segment gpseg10: -gpseg p10
+    For the master node the option will be : -gpseg -1
+
+  -start                                             - $start
+    Start date and time for collecting logs.
+    The timestamp must be in the format: YYYY-MM-DD_HH:MM
+    Without quotes, spaces between the date and time.
+    If the -start time is not specified, then the time is used,
+    which was an hour ago before this script was started.
+
+  -end                                               - $end
+    End date and time for collecting logs.
+    The timestamp must be in the format: YYYY-MM-DD_HH:MM
+    Without quotes, spaces between the date and time.
+    If -end is not specified, then current time is used.
+
+  -all-hosts
+    Full path to a file listing all Arenadata DB cluster hostnames.
+    If the file is not specified, the default file is:
+    /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
+
+  -free-space                                        - $free_spc
+    The percentage of free space on the partition with
+    the working directory -dir, which is allowed to be occupied
+    by the collected logs from the master or segments.
+
+  -pxf
+    Collect PXF configuration files and logs.
+
+  -gpperfmon
+    Collect historical tables information from the gpperfmon DB.
+
+  -adbmon
+    Collect information from tables in "adbmon" schema.
+
+  -t_audit_top
+    Collect information from the adbmon.t_audit_top table.
+    The downloaded file may be very big.
+    That's why collecting t_audit_top is a separate parameter.
+
+  -db                                                - $dbname
+    The name of the database where the adbmon schema is located.
+
+  -dbuser                                            - $dbuser
+    Database superuser name. In case it is not gpadmin.
+
+  version                                            - $script_version
+    Current version of the programme $module.
+
+  -help
+    Show this usage help and exit.
+
+
+*****************************************************
+EXAMPLES:
+*****************************************************
+
+# Collecting DBMS message logs from the master node:
+bash $script gp_log_collector -gpseg -1 -start 2015-11-25_09:00 -end 2015-11-25_18:00
+
+# Collecting DBMS message logs from the mirror-segment No 2:
+bash $script gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end 2015-11-25_18:00
+
+# collecting diagnostic information (without PXF, gpperfmon, adbmon):
+bash $script gp_log_collector
+
+# collecting diagnostic information with PXF:
+bash $script gp_log_collector -pxf
+
+# collecting diagnostic with tables from the gpperfmon DB:
+bash $script gp_log_collector -gpperfmon -start 2025-03-19_18:00 -end 2025-03-19_19:00
+
+# collecting diagnostic with tables from the gpperfmon DB and adbmon schema:
+bash $script gp_log_collector -gpperfmon -adbmon -db dwh -start 2025-03-19_18:00 -end 2025-03-19_19:00
+
+# collecting diagnostic with adbmon schema including t_audit_top table:
+bash $script gp_log_collector -t_audit_top -db dwh -start 2025-03-19_18:00 -end 2025-03-19_19:00
+
