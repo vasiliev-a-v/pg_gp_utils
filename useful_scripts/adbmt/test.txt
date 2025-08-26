@@ -1,0 +1,35 @@
+Тестирование утилиты adbmt (Arenadata DB Magic Tool)
+
+Коллеги, добрый день!
+Я написал утилиту (adbmt) для сбора диагностической информации.
+При создании вдохновлялся аналогичной утилитой gpmt от наших конкурентов.
+gpmt GPMT (Greenplum Magic Tool):
+https://techdocs.broadcom.com/us/en/vmware-tanzu/data-solutions/tanzu-greenplum/6/greenplum-database/utility_guide-ref-gpmt.html
+
+Утилита adbmt (Arenadata DB Magic Tool) предоставляет набор инструментов (tool) для сбора диагностической информации, необходимой службе техподдержкой поддержки Arenadata.
+Утилита adbmt - это приблизительный аналог утилиты gpmt.
+
+Пока из всех "инструментов" реализован только gp_log_collector.
+Но собственно, он больше всего и нужен.
+
+Есть необходимость утилиту поиспытывать.
+
+Инструкция / Описание:
+https://github.com/vasiliev-a-v/pg_gp_utils/blob/main/useful_scripts/adbmt/README.ru.md
+tar.gz архив с утилитой:
+https://github.com/vasiliev-a-v/pg_gp_utils/blob/main/useful_scripts/adbmt/adbmt.tar.gz
+Репозиторий с файлами:
+https://github.com/vasiliev-a-v/pg_gp_utils/tree/main/useful_scripts/adbmt
+
+Основной исполняемый файл adbmt.sh
+
+Все вопросы и пожелания пишите в треде.
+
+---
+
+
+Баг в том, что нету этой переменной.
+Сделать проверку $all_hosts существует, если нет - то выйти.
+
+- availble_hosts должен стирать и записывать себя заново.
+vzh@10.92.35.104
