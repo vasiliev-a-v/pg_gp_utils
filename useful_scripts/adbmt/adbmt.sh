@@ -5,7 +5,7 @@
 
 ## Defining global variables ---------------------------------------- ##
 
-script_version=0.2                    # script version
+script_version=0.3                    # script version
 script=$(readlink -f $0)              # full path to script
 current_path=$(dirname $script)       # catalog where script is located
 module="$(basename $script)"          # scripts file name
@@ -13,6 +13,7 @@ scrpt_fn=${module%".sh"}              # scriptname without .sh
 declare -a argv=( $* )                # puts argues from CLI into array
 LOG_FILE=$current_path/$scrpt_fn.log  # path to directory log filename
 
+# TODO: отрегулировать различные exit. Если внутри функции - то return.
 
 func_make_dtm() {  # add date time to every line in $LOG_FILE
   while IFS= read -r line; do
@@ -246,12 +247,29 @@ func_prepare() {  # prepare before getting data
   # if psql_exit_code is not zero - we have no connections to ADB.
   # Therefore, we will not collect files that require a psql session.
   echo "--- Testing psql connection to Database: ---"
-  result=$(psql "dbname=template1 user=$dbuser application_name=$scrpt_fn" \
-                -At 2>&1 -c "SELECT 'test_connection_adbmt: ' || now()"
-          )
+
+  result=$(
+           psql "
+                 dbname=template1           \
+                 user=$dbuser               \
+                 application_name=$scrpt_fn \
+                 connect_timeout=10         \
+                 options='
+                          -c gp_resource_group_bypass=true          \
+                          -c gp_resource_group_queuing_timeout=1min \
+                          -c statement_timeout=1min                 \
+                          -c gp_interconnect_type=tcp               \
+                         ' \
+                "          \
+                -t 2>&1    \
+                -f $current_path/adbmt_queue.sql
+  )
+
   psql_exit_code=$?
   if [[ $psql_exit_code == 0 ]]; then
     echo "Connection to DBMS is OK."
+    echo -ne "$result"
+    echo "---"
   else
     echo "Connection to DBMS failed with an error:"
     echo "$result"
@@ -337,8 +355,13 @@ func_gp_log_collector() {  # gp_log_collector tool
     func_get_dynamic_data 1         # 1 snapshot of dynamic data
     func_get_static_data            # get static data
     if [[ $pxf == "true" ]]; then
-      func_get_pxf_logs             # get pxf logs from all cluster
-      func_get_pxf_conf             # get pxf conf from all cluster
+      if [[ -d $PXF_HOME ]]; then
+        func_get_pxf_logs             # get pxf logs from all cluster
+        func_get_pxf_conf             # get pxf conf from all cluster
+      else
+        echo "The directory \$PXF_HOME is missing."
+        echo "PXF logs and configs have not collected."
+      fi
     fi
     if [[ $adbmon = "true" ]] || [[ $t_audit_top = "true" ]]; then
       func_get_adbmon               # get data from adbmon
@@ -363,9 +386,24 @@ func_get_dynamic_data() {  # dynamic data gathering
   func_get_netstat_s $snp $dtm
   if [[ $psql_exit_code == 0 ]]; then   # psql-scripts execution:
     echo "--- Getting dynamic SQL-queries ---"
-    psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
-         -v adbmt_dir="${adbmt_dir}" -v snp="${snp}" \
+    psql "
+          dbname=$dbname             \
+          user=$dbuser               \
+          application_name=$scrpt_fn \
+          connect_timeout=10         \
+          options='
+                   -c gp_resource_group_queuing_timeout=1min \
+                   -c statement_timeout=1min                 \
+                   -c gp_interconnect_type=tcp               \
+                  ' \
+         "          \
+         -v adbmt_dir="${adbmt_dir}" \
+         -v snp="${snp}" \
          -f $current_path/adbmt_psql_dynamic.sql
+
+    # psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+         # -v adbmt_dir="${adbmt_dir}" -v snp="${snp}" \
+         # -f $current_path/adbmt_psql_dynamic.sql
   fi
 }
 
@@ -374,9 +412,24 @@ func_get_static_data() {  # static data gathering
   echo "--- Getting static data ---"
   if [[ $psql_exit_code == 0 ]]; then   # psql-scripts execution:
     echo "--- Getting static SQL-queries ---"
-    psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+    psql "
+          dbname=$dbname             \
+          user=$dbuser               \
+          application_name=$scrpt_fn \
+          connect_timeout=10         \
+          options='
+                   -c gp_resource_group_queuing_timeout=1min \
+                   -c statement_timeout=1min                 \
+                   -c gp_interconnect_type=tcp               \
+                  ' \
+         "          \
          -v adbmt_dir="${adbmt_dir}" \
          -f $current_path/adbmt_psql_static.sql
+
+    # psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+         # -v adbmt_dir="${adbmt_dir}" \
+         # -f $current_path/adbmt_psql_static.sql
+
   fi
   func_get_adb_service_logs             # get some different service logs
   func_get_different_os_files           # os-release, sysctl, etc
@@ -573,7 +626,7 @@ func_get_sar() {  # get sar files from all cluster
     if [[ -d /var/log/sa ]]; then
       SA_DIR=/var/log/sa
     else
-      echo "sar's directory not found" && exit 127
+      echo "sar's directory not found" && return 127
     fi
   fi
 
@@ -676,29 +729,81 @@ func_make_tar_and_del_tmp_dir() {  # make tar-file and delete obsolete directory
 
 func_get_gpperfmon() {  # get info from gpperfmon database tables
   echo "--- Getting info from gpperfmon database tables ---"
-  psql "dbname=gpperfmon user=$dbuser application_name=$scrpt_fn" \
-       -f $current_path/adbmt_gpperfmon.sql \
+
+  psql "
+        dbname=gpperfmon           \
+        user=$dbuser               \
+        application_name=$scrpt_fn \
+        connect_timeout=10         \
+        options='
+                 -c gp_resource_group_queuing_timeout=1min \
+                 -c statement_timeout=1min                 \
+                 -c gp_interconnect_type=tcp               \
+                ' \
+       "          \
        -v adbmt_dir="${adbmt_dir}" \
+       -f $current_path/adbmt_gpperfmon.sql \
        -v begin="$start" \
        -v end="$end"
+
+  # psql "dbname=gpperfmon user=$dbuser application_name=$scrpt_fn" \
+       # -f $current_path/adbmt_gpperfmon.sql \
+       # -v adbmt_dir="${adbmt_dir}" \
+       # -v begin="$start" \
+       # -v end="$end"
+
 }
 
 
 func_get_adbmon() {  # get adbmon quieries from adbmon schema
   echo "--- Getting adbmon-schema tables ---"
-  psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
-       -f $current_path/adbmon_queries.sql \
+
+  psql "
+        dbname=$dbname             \
+        user=$dbuser               \
+        application_name=$scrpt_fn \
+        connect_timeout=10         \
+        options='
+                 -c gp_resource_group_queuing_timeout=1min \
+                 -c statement_timeout=5min                 \
+                 -c gp_interconnect_type=tcp               \
+                ' \
+       "          \
        -v adbmt_dir="${adbmt_dir}" \
+       -f $current_path/adbmon_queries.sql \
        -v begin="$start" \
        -v end="$end"
 
+  # psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+       # -f $current_path/adbmon_queries.sql \
+       # -v adbmt_dir="${adbmt_dir}" \
+       # -v begin="$start" \
+       # -v end="$end"
+
   if [[ $t_audit_top == "true" ]]; then  # get t_audit_top
-     echo "--- Getting adbmon.t_audit_top table ---"
-     psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
-          -f $current_path/adbmon_t_audit_top.sql \
-          -v adbmt_dir="${adbmt_dir}" \
-          -v begin="$start" \
-          -v end="$end"
+    echo "--- Getting adbmon.t_audit_top table ---"
+
+    psql "
+          dbname=$dbname             \
+          user=$dbuser               \
+          application_name=$scrpt_fn \
+          connect_timeout=10         \
+          options='
+                   -c gp_resource_group_queuing_timeout=1min \
+                   -c statement_timeout=5min                 \
+                   -c gp_interconnect_type=tcp               \
+                  ' \
+         "          \
+         -v adbmt_dir="${adbmt_dir}" \
+         -f $current_path/adbmon_t_audit_top.sql \
+         -v begin="$start" \
+         -v end="$end"
+
+     # psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+          # -f $current_path/adbmon_t_audit_top.sql \
+          # -v adbmt_dir="${adbmt_dir}" \
+          # -v begin="$start" \
+          # -v end="$end"
   fi
 }
 
@@ -712,6 +817,9 @@ func_pack_to_tar_gz() {  # pack diagnostic data to tar.gz archive
 
   echo "--- Packing diagnostic data to tar.gz ---"
   echo "File: ${adbmt_tmp}/${tar_fn}.tar.gz"
+
+  sleep 1
+  cp $LOG_FILE ${adbmt_dir}  # copying adbmt log-file to diagnostic pack
 
   cd ${adbmt_dir}
   tar Pcfz "${adbmt_tmp}/${tar_fn}.tar.gz" *
@@ -746,4 +854,12 @@ exit 0
   - without -all-hosts
   - check for the case when the script is started not under the ADB owner
     (for example, under root).
+
+2025-09-02 - version 0.3.: Added queue check in psql-file: adbmt_queue.sql
+
+
+# TODO: проверить на убунту выгрузку с мастера
+# TODO: проверить на убунту выгрузку с сегмента
+# TODO: проверить на Альт выгрузку с мастера и сегмента
+# TODO: если в all_hosts менее трех нод, то останавливаем выгрузку.
 

@@ -4,10 +4,27 @@
 # DESCRIPTION -------------------------------------------------------- #
 # adbmt_exec upload script on master node and executes adbmt.sh
 
-# host=avas-cdwm1
+# Centos
+host=avas-cdwm1
+ssh_user=avas
+
+# Vit
+# host=10.92.35.104
+# ssh_user=vzh
+
+# Astra
+# host=10.92.5.181
 # ssh_user=avas
-host=10.92.35.104
-ssh_user=vzh
+
+# Ubuntu
+# host=10.92.5.36
+# ssh_user=avas
+
+# Alt Linux
+# host=10.92.36.197
+# ssh_user=avas
+
+
 scr_dir=/p/pg_gp_utils/useful_scripts
 
 func_main() {  # main function
@@ -24,16 +41,20 @@ EOF
   ssh $ssh_user@$host -q -T << EOF
   whoami
   sudo su -
-    whoami
+    echo пользователь: $(whoami)
     tar Pxfz /tmp/adbmt.tar.gz -C /tmp
     chown -R gpadmin:gpadmin /tmp/adbmt
     ls -ld /tmp/adbmt
-    # bash /tmp/adbmt/adbmt.sh gp_log_collector \
-      # -all-hosts /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
     sudo -iu gpadmin
-      # whoami
-      # bash /tmp/adbmt/adbmt.sh gp_log_collector -g -1 -start 2025-08-01_00:00 -end 2025-08-16_22:00 -free-space 1 -all-hosts $PATH_ARENADATA_CONFIGS/arenadata_all_hosts.hosts
-      # bash /tmp/adbmt/adbmt.sh gp_log_collector -g m0 -start 2025-08-16_00:00 -end 2025-08-16_22:00 
+      echo пользователь: $(whoami)
+
+      bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg -1 -start 2025-08-21_00:01 -end 2025-09-02_16:59
+
+      # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf -start 2025-07-21_00:01 -end 2025-09-02_16:59
+      # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf -t_audit_top \
+        -db inc0025383 -start 2025-07-20_00:01 -end 2025-07-22_13:59
+
+            # bash /tmp/adbmt/adbmt.sh gp_log_collector -g m0 -start 2025-08-16_00:00 -end 2025-08-16_22:00 
       # bash /tmp/adbmt/adbmt.sh gp_log_collector
       # bash /tmp/adbmt/adbmt.sh   \
          # gp_log_collector        \
@@ -48,16 +69,15 @@ EOF
       # echo "хостнейм: " \$(hostname -s)
       # echo ---
 
-      bash /tmp/adbmt/adbmt.sh gp_log_collector \
-      -gpseg -1 \
-      -start 2025-08-26_19:00 -end 2025-08-26_18:00 \
-      -all-hosts /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
+      # bash /tmp/adbmt/adbmt.sh gp_log_collector \
+      # -gpseg m2 \
+      # -start 2025-08-20_19:00 -end 2025-08-26_18:00 \
+      # -all-hosts /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
 
       # bash /tmp/adbmt/adbmt.sh gp_log_collector -pxf \
       # -start 2025-08-26_09:00 -end 2025-08-26_18:00 \
       # -all-hosts /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
 
-      # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf -adbmon -t_audit_top -db inc0025383 -start 2025-07-21_00:01 -end 2025-07-21_13:59
       # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m1 -start 2025-07-21_00:01 -end 2025-07-21_13:59
 
       # TODO: проверить:

@@ -130,7 +130,7 @@ bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end
 
 Примечания:
 В таблице gp_server_version.csv поля:
-  - gp_version_at_initdb - это версия при инициализации.
+  - gp_version_at_initdb - это версия ADB при инициализации.
   - gp_server_version - это текущая версия ADB.
   - version() - это полный вывод о версии.
 Вывод ps axuww (файлы ps_axuww) специально собраны в формате csv.
