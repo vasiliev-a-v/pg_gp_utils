@@ -36,6 +36,7 @@ EOF
 
   mv $scr_dir/adbmt.tar.gz $scr_dir/adbmt.tar.gz.old
   tar Pcfz $scr_dir/adbmt.tar.gz -C $scr_dir --exclude=adbmt/adbmt.tar.gz --exclude=adbmt/draft adbmt
+  cp $scr_dir/adbmt.tar.gz $scr_dir/adbmt
   exit 0
   scp $scr_dir/adbmt.tar.gz $ssh_user@$host:/tmp && echo "scp прошёл удачно"
   ssh $ssh_user@$host -q -tt << 'EOF'
