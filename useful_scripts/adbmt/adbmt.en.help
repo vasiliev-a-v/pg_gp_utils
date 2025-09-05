@@ -35,15 +35,16 @@ TOOL OPTIONS:
 *****************************************************
 
 TOOL_OPTIONS:                                        - Current values:
-  -dir                                               - $adbmt_tmp
+  -dir <DIRECTORY>                                   - $adbmt_tmp
     Path to the working directory where temporary files
     will be placed during compilation, as well as the final tar.gz.
     This directory should not have spaces characters in its name.
 
-  -log
+  -log <FILENAME>                                    - $LOG_FILE
     Full path to the log file of this executable script.
     By default, the path to the log is in the $module script location:
     $LOG_FILE
+    The log file is also copied to the final tar.gz file with diagnostics.
 
   -gpseg <Role_and_ID>
     The segment to unload the DBMS message logs.
@@ -53,25 +54,25 @@ TOOL_OPTIONS:                                        - Current values:
     For example: primary segment gpseg10: -gpseg p10
     For the master node the option will be : -gpseg -1
 
-  -start                                             - $start
+  -start <YYYY-MM-DD_HH:MM>                          - $start
     Start date and time for collecting logs.
     The timestamp must be in the format: YYYY-MM-DD_HH:MM
     Without quotes, spaces between the date and time.
     If the -start time is not specified, then the time is used,
     which was an hour ago before this script was started.
 
-  -end                                               - $end
+  -end <YYYY-MM-DD_HH:MM>                            - $end
     End date and time for collecting logs.
     The timestamp must be in the format: YYYY-MM-DD_HH:MM
     Without quotes, spaces between the date and time.
     If -end is not specified, then current time is used.
 
-  -all-hosts
+  -all-hosts <FILENAME>
     Full path to a file listing all Arenadata DB cluster hostnames.
     If the file is not specified, the default file is:
     /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
 
-  -free-space                                        - $free_spc
+  -free-space <PERCENT>                              - $free_spc
     The percentage of free space on the partition with
     the working directory -dir, which is allowed to be occupied
     by the collected logs from the master or segments.
@@ -90,10 +91,10 @@ TOOL_OPTIONS:                                        - Current values:
     The downloaded file may be very big.
     That's why collecting t_audit_top is a separate parameter.
 
-  -db                                                - $dbname
+  -db <DATABASE>                                     - $dbname
     The name of the database where the adbmon schema is located.
 
-  -dbuser                                            - $dbuser
+  -dbuser <DBUSER>                                   - $dbuser
     Database superuser name. In case it is not gpadmin.
 
   version                                            - $script_version
@@ -128,3 +129,7 @@ bash $script gp_log_collector -gpperfmon -adbmon -db dwh -start 2025-03-19_18:00
 # collecting diagnostic with adbmon schema including t_audit_top table:
 bash $script gp_log_collector -t_audit_top -db dwh -start 2025-03-19_18:00 -end 2025-03-19_19:00
 
+
+It is often necessary to perform several collection varies.
+For example: to collect logs from the master, collect logs from one segment, collect diagnostics.
+In this case, it is necessary to run the adbmt.sh utility several times within different options.
