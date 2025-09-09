@@ -44,6 +44,24 @@ TOTAL_GZ_BYTES=0
 DEBUG="${DEBUG:-0}"  # 1 = подробная отладка
 
 
+func_main() {  ## Главная функция ------------------------------------------- ##
+  func_get_arguments "$@"
+  func_parse_gpseg
+  func_resolve_seg_host_and_path
+  func_debug_remote_probe
+  func_remote_scan_and_build_intervals
+  func_select_files_by_range
+  func_pick_sample_and_estimate_ratio
+  func_estimate_planned_bytes
+  func_check_free_space
+
+  if (( DRY_RUN != 1 )); then
+    func_copy_with_compression
+  fi
+  func_print_summary
+}
+
+
 ## --------- Функции вывода сообщений на экран ------------------------------ ##
 func_log_ts()  { date +'%F %T'; }
 
@@ -208,10 +226,14 @@ func_resolve_seg_host_and_path() {  ## Определение SEG_HOST и PG_LOG
   echo GPSEG=$GPSEG
   echo all_hosts=${all_hosts}
 
-  # берем первую найденную строку
-  local line
-  line="$(gpssh -f "$all_hosts" "$cmd" 2>/dev/null | \
-                grep "/${ROLE}/gpseg${GPSEG}/pg_log" | head -n1 || true)"
+  if ((GPSEG == -1)); then
+    hosts_clause="-h $(hostname)"
+  else
+    hosts_clause="-f $all_hosts"
+  fi
+  local line  # берем первую найденную строку
+  line="$(gpssh ${hosts_clause} "$cmd" 2>/dev/null | \
+            grep "/${ROLE}/gpseg${GPSEG}/pg_log" | head -n1 || true)"
 
   # убрать символы CR/LF и лишние табы/пробелы
   line="$(printf '%s' "$line" | tr -d '\r' )"
@@ -456,24 +478,6 @@ func_print_summary() {  ## Итоговая сводка -----------------------
   fi
   func_prt_inf "Список файлов:"
   printf '  %s\n' "${SELECTED[@]}"
-}
-
-
-func_main() {  ## Главная функция ------------------------------------------- ##
-  func_get_arguments "$@"
-  func_parse_gpseg
-  func_resolve_seg_host_and_path
-  func_debug_remote_probe
-  func_remote_scan_and_build_intervals
-  func_select_files_by_range
-  func_pick_sample_and_estimate_ratio
-  func_estimate_planned_bytes
-  func_check_free_space
-
-  if (( DRY_RUN != 1 )); then
-    func_copy_with_compression
-  fi
-  func_print_summary
 }
 
 

@@ -1,11 +1,17 @@
 #!/bin/bash
 
+# TODO: если в all_hosts менее трех нод, то останавливаем выгрузку (??)
+# TODO: текущее место запуска скрипта (текущий хост) - это считается мастер мастер.
+# если на вход приходит собрать логи с "мастера", то логи будут собираться с текущего хоста.
+# То есть, если на кластере два мастера, то логи будут собираться с хоста, на котором запущен скрипт.
+# Если вдруг логи нужны с standby master, то нужно запустить скрипт на standby master.
+
 # DESCRIPTION -------------------------------------------------------- #
 # adbmt is an analogue of the gpmt utility
 
 ## Defining global variables ---------------------------------------- ##
 
-script_version=0.4                    # script version
+script_version=0.3                    # script version
 script=$(readlink -f $0)              # full path to script
 current_path=$(dirname $script)       # catalog where script is located
 module="$(basename $script)"          # scripts file name
@@ -108,6 +114,15 @@ func_check_arguments() {  # check correctness the choice of options
     func_parse_gpseg
   fi
 
+  # По умолчанию база данных $dbname определена как adb
+  # if [[ $adbmon == "true" ]] || [[ $t_audit_top == "true" ]]; then
+      # if [ -z "$dbname" ]; then
+          # echo "ERROR: -dbname option is not defined"
+          # echo "You need determine the database where adbmon schema is located."
+          # exit 5
+      # fi
+  # fi
+
   func_start_end_validation  # $start and $end validation
 
   if [[ ! -f $all_hosts ]]; then  # check all_hosts file validation
@@ -122,7 +137,7 @@ func_check_arguments() {  # check correctness the choice of options
       echo "Your cluster has this file here:"
       echo $hostfile
     fi
-    exit 1
+    exit 5
   fi
 
 }
@@ -146,7 +161,7 @@ func_parse_gpseg() {  # Get from $gpseg values for $seg_role and $seg_num
     seg_num="${BASH_REMATCH[1]}"
   else
     echo "ERROR: Incorrect -gpseg: $s (expected -1 | N | pN | mN)"
-    exit 2
+    exit 1
   fi
 
   if [[ "$seg_role" != "master" ]]; then
@@ -167,13 +182,14 @@ func_start_end_validation() {  # $start and $end validation
 
   for v in start end; do
     val=${!v}
+    # if [[ $val =~ $fmt ]] && [[ $(date -d "${val/_/ }" '+%F_%T' 2>/dev/null) == "$val" ]]; then
     if [[ $val =~ $fmt ]] && \
        [[ $(date -d "${val/_/ }" '+%Y-%m-%d_%H:%M' 2>/dev/null) == "$val" ]];
     then
       true  # format OK.
     else
-      echo "ERROR: Incorrect format: $v='$val'"
-      exit 3
+      echo "Incorrect format: $v='$val'"
+      exit 5
     fi
   done
 
@@ -186,7 +202,7 @@ func_start_end_validation() {  # $start and $end validation
     echo 'ERROR: "start" must be before "end"'
     echo "start: $start"
     echo "end: $end"
-    exit 4
+    exit 5
   fi
 }
 
@@ -213,22 +229,22 @@ func_prepare() {  # prepare before getting data
     echo "ERROR: variable \$MASTER_DATA_DIRECTORY is empty"
     echo "The current user is: " $USER
     echo "The DBMS user is: " $dbms_user
-    exit 5
+    exit 42
   fi
   dbms_user=$(ls -ld $MASTER_DATA_DIRECTORY | awk '{print $3}')
   if [[ $USER != $dbms_user ]]; then
     echo "ERROR: The current user does not match the DBMS system owner user!"
     echo "The current user is: " $USER
     echo "The DBMS user is: " $dbms_user
-    exit 6
+    exit 42
   fi
 
   mkdir -p $adbmt_dir
-  if (( $? == 0 )); then
+  if [[ $? == 0 ]]; then
     echo "Directory for collected information: "$adbmt_dir
   else
-    echo "ERROR: Can not create directory "$adbmt_dir
-    exit 7
+    echo "Can not create directory: "$adbmt_dir
+    exit 127
   fi
 
   echo -n > $adbmt_dir/available_hosts.hosts && \
@@ -256,7 +272,7 @@ func_prepare() {  # prepare before getting data
   )
 
   psql_exit_code=$?
-  if (( $psql_exit_code == 0 )); then
+  if [[ $psql_exit_code == 0 ]]; then
     echo "Connection to DBMS is OK."
     echo -ne "$result"
     echo "---"
@@ -335,22 +351,19 @@ func_gp_log_collector() {  # gp_log_collector tool
     pg_log_result=$?
     echo "Script adbmt_pg_log.sh finished."
     if (( pg_log_result != 0 )); then
-      echo "ERROR: Errors occurred while copying log files, check file: "$LOG_FILE
-      exit 8
+      echo "Errors occurred while copying log files, check file: "$LOG_FILE
+      exit 10
     fi
 
   else
 
-    if (( $(wc -l $all_hosts | cut -d ' ' -f1) < 2 )); then
-      only_one_available_host=true  # this label is used in func_get_ps
-    fi
     # get basic diagnostics: OS-utilities out, config-files and logs
     func_get_dynamic_data 1         # 1 snapshot of dynamic data
     func_get_static_data            # get static data
     if [[ $pxf == "true" ]]; then
       if [[ -d $PXF_HOME ]]; then
-        func_get_pxf_logs           # get pxf logs from all cluster
-        func_get_pxf_conf           # get pxf conf from all cluster
+        func_get_pxf_logs             # get pxf logs from all cluster
+        func_get_pxf_conf             # get pxf conf from all cluster
       else
         echo "The directory \$PXF_HOME is missing."
         echo "PXF logs and configs have not collected."
@@ -393,6 +406,10 @@ func_get_dynamic_data() {  # dynamic data gathering
          -v adbmt_dir="${adbmt_dir}" \
          -v snp="${snp}" \
          -f $current_path/adbmt_psql_dynamic.sql
+
+    # psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+         # -v adbmt_dir="${adbmt_dir}" -v snp="${snp}" \
+         # -f $current_path/adbmt_psql_dynamic.sql
   fi
 }
 
@@ -414,6 +431,11 @@ func_get_static_data() {  # static data gathering
          "          \
          -v adbmt_dir="${adbmt_dir}" \
          -f $current_path/adbmt_psql_static.sql
+
+    # psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+         # -v adbmt_dir="${adbmt_dir}" \
+         # -f $current_path/adbmt_psql_static.sql
+
   fi
   func_get_adb_service_logs             # get some different service logs
   func_get_different_os_files           # os-release, sysctl, etc
@@ -458,17 +480,13 @@ func_get_ps() {  # get "ps axuww" from all cluster to csv
   local path=${adbmt_dir}/${snp}.ps_axuww_${fn_dtm}.csv
 
   echo "Getting ps axuww to ${path}.gz"
-  if [[ $only_one_available_host == true ]]; then
-    echo only_one_available_host = $only_one_available_host
-    bash /tmp/ps_axuww.sh > ${path}
-  else
-    gpscp -f $all_hosts $current_path/ps_axuww.sh =:/tmp/
-    gpssh -f $all_hosts "bash /tmp/ps_axuww.sh" > ${path}
-    gpssh -f $all_hosts "rm /tmp/ps_axuww.sh && \
-      echo 'Temp file /tmp/ps_axuww.sh was successfully deleted.'"
-  fi
-  sed -i 's/^\[\([^]]*\)\] \(.*\)/"\1",\2/' ${path}
+  gpscp -f $all_hosts $current_path/ps_axuww.sh =:/tmp/
+  gpssh -f $all_hosts "bash /tmp/ps_axuww.sh" > ${path}
+  sed -i 's/^\[\([^]]*\)\] \(.*\)/"\1",\2/'     ${path}
   gzip -f ${path}
+  gpssh -f $all_hosts "rm /tmp/ps_axuww.sh && \
+    echo 'Temp file /tmp/ps_axuww.sh was successfully deleted.'"
+
   echo "Result file:"
   ls -1d ${path}.gz
 }
@@ -733,6 +751,13 @@ func_get_gpperfmon() {  # get info from gpperfmon database tables
        -f $current_path/adbmt_gpperfmon.sql \
        -v begin="$start" \
        -v end="$end"
+
+  # psql "dbname=gpperfmon user=$dbuser application_name=$scrpt_fn" \
+       # -f $current_path/adbmt_gpperfmon.sql \
+       # -v adbmt_dir="${adbmt_dir}" \
+       # -v begin="$start" \
+       # -v end="$end"
+
 }
 
 
@@ -755,6 +780,12 @@ func_get_adbmon() {  # get adbmon quieries from adbmon schema
        -v begin="$start" \
        -v end="$end"
 
+  # psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+       # -f $current_path/adbmon_queries.sql \
+       # -v adbmt_dir="${adbmt_dir}" \
+       # -v begin="$start" \
+       # -v end="$end"
+
   if [[ $t_audit_top == "true" ]]; then  # get t_audit_top
     echo "--- Getting adbmon.t_audit_top table ---"
 
@@ -774,6 +805,11 @@ func_get_adbmon() {  # get adbmon quieries from adbmon schema
          -v begin="$start" \
          -v end="$end"
 
+     # psql "dbname=$dbname user=$dbuser application_name=$scrpt_fn" \
+          # -f $current_path/adbmon_t_audit_top.sql \
+          # -v adbmt_dir="${adbmt_dir}" \
+          # -v begin="$start" \
+          # -v end="$end"
   fi
 }
 
@@ -826,14 +862,5 @@ exit 0
     (for example, under root).
 
 2025-09-02 - version 0.3.: Added queue check in psql-file: adbmt_queue.sql
-
-2025-09-02 - version 0.4.: Added two features:
-  1. The current host, where this script is launched considered as master
-     (not standby master).
-     If you need get data from standby master, then you need to launch
-     the script on standby master.
-  2. if only one available host is in cluster, then func_get_ps get data
-     without using "gpssh".
-
 
 

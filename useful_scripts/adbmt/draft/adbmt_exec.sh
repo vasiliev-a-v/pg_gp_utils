@@ -4,25 +4,15 @@
 # DESCRIPTION -------------------------------------------------------- #
 # adbmt_exec upload script on master node and executes adbmt.sh
 
-# Vit
-# host=10.92.35.104
+ssh_user=avas
+# host=avas-cdwm1      # Centos
+host=10.92.5.181     # Astra
+# host=10.92.5.36      # Ubuntu
+# host=10.92.36.197    # Alt Linux
+
+# host=10.92.35.104    # Vit
 # ssh_user=vzh
 
-# Centos
-host=avas-cdwm1
-ssh_user=avas
-
-# Astra
-# host=10.92.5.181
-# ssh_user=avas
-
-# Ubuntu
-# host=10.92.5.36
-# ssh_user=avas
-
-# Alt Linux
-# host=10.92.36.197
-# ssh_user=avas
 
 
 scr_dir=/p/pg_gp_utils/useful_scripts
@@ -37,9 +27,8 @@ EOF
   mv $scr_dir/adbmt.tar.gz $scr_dir/adbmt.tar.gz.old
   tar Pcfz $scr_dir/adbmt.tar.gz -C $scr_dir --exclude=adbmt/adbmt.tar.gz --exclude=adbmt/draft adbmt
   cp $scr_dir/adbmt.tar.gz $scr_dir/adbmt
-  exit 0
   scp $scr_dir/adbmt.tar.gz $ssh_user@$host:/tmp && echo "scp прошёл удачно"
-  ssh $ssh_user@$host -q -tt << 'EOF'
+  ssh $ssh_user@$host -q -T << 'EOF'
     whoami
     sudo -iu root
     echo пользователь: $(whoami)
@@ -49,13 +38,27 @@ EOF
       # sudo -iu gpadmin
       su - gpadmin
         echo пользователь: $(whoami)
-        bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m1 -start 2025-08-21_00:01 -end 2025-09-02_16:59
+        # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg -1 -start 2025-08-21_00:01 -end 2025-09-02_16:59
+        bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf
+exit 0
+exit 0
+exit 0
+EOF
+}
+
+# 2025-07-21 00:01
+# 2025-07-21 13:59
+
+
+func_main  # from this point script starts running
+exit 0
+
+
+
 
         # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf -start 2025-07-21_00:01 -end 2025-09-02_16:59
-        # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf -t_audit_top \
-          -db inc0025383 -start 2025-07-20_00:01 -end 2025-07-22_13:59
-
-              # bash /tmp/adbmt/adbmt.sh gp_log_collector -g m0 -start 2025-08-16_00:00 -end 2025-08-16_22:00 
+        # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf -t_audit_top -db inc0025383 -start 2025-07-20_00:01 -end 2025-07-22_13:59
+        # bash /tmp/adbmt/adbmt.sh gp_log_collector -g m0 -start 2025-08-16_00:00 -end 2025-08-16_22:00 
         # bash /tmp/adbmt/adbmt.sh gp_log_collector
         # bash /tmp/adbmt/adbmt.sh   \
            # gp_log_collector        \
@@ -82,23 +85,7 @@ EOF
         # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m1 -start 2025-07-21_00:01 -end 2025-07-21_13:59
 
         # TODO: проверить:
-        # bash /tmp/adbmt/adbmt.sh gp_log_collector -t_audit_top \
-          -db inc0025383 -start 2025-07-20_00:01 -end 2025-07-22_13:59
-exit 0
-exit 0
-exit 0
-EOF
-}
-
-# 2025-07-21 00:01
-# 2025-07-21 13:59
-
-
-func_main  # from this point script starts running
-exit 0
-
-
-
+        # bash /tmp/adbmt/adbmt.sh gp_log_collector -t_audit_top -db inc0025383 -start 2025-07-20_00:01 -end 2025-07-22_13:59
 
 
 

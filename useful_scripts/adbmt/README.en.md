@@ -1,54 +1,56 @@
 # adbmt (Arenadata DB Magic Tool)
 
-Утилита adbmt (Arenadata DB Magic Tool) предоставляет набор инструментов (tool) для сбора диагностической информации, необходимой службе техподдержкой поддержки Arenadata.  
-Утилита adbmt - это приблизительный аналог утилиты gpmt.
+The adbmt utility (Arenadata DB Magic Tool) provides a set of tools for collecting diagnostic information required by Arenadata support.  
+The adbmt utility is a approximate analogue of the gpmt utility.
 
-## УСТАНОВКА:
-Скопировать на мастер-ноду файл adbmt.tar.gz в директорию /tmp.
-Распаковать tar.gz архив с утилитой командами:
+## INSTALLATION:
+Copy the adbmt.tar.gz file to the /tmp directory on the master node.  
+Unpack the tar.gz archive with the utility using the commands:
 ```
 tar Pxfz /tmp/adbmt.tar.gz -C /tmp
 chown -R gpadmin:gpadmin /tmp/adbmt
 ls -ld /tmp/adbmt
 ```
 
-## ИСПОЛЬЗОВАНИЕ:
+## USAGE:
 /tmp/adbmt.sh \<TOOL\> [<TOOL_OPTIONS> ...]
 
 ### TOOL:
 gp_log_collector  
-Это инструмент (tool) для сбора логов и параметров, необходимых для диагностики СУБД.
+This is a tool for collecting logs and parameters, necessary for DBMS diagnostics.
 
-## ОПИСАНИЕ:
-Инструмент gp_log_collector может быть запущен в одном из трех вариантов:
-  1. выгрузка журналов сообщений СУБД с мастера.
-  2. выгрузка журналов сообщений СУБД с сегмента: primary или mirror.
-  3. сбор диагностической информации.  
+## DESCRIPTION:
+The gp_log_collector tool can be launched in one of three ways:
+  1. collecting DBMS message logs from the master.
+  2. collecting DBMS message logs from the segment: primary or mirror.
+  3. collecting diagnostic information.  
 
-### Подробнее об этих трёх вариантах:
-#### 1. выгрузка журналов сообщений СУБД с мастера.  
-При выгрузке журналов сообщений СУБД утилита выгружает соответствующие файлы за установленный параметрами -start и -end период в рабочую директорию на мастер-ноде.  
-Рабочую директорию можно переопределить параметром -dir.  
-По умолчанию - это /tmp.  
-Несжатые csv-файлы утилита при копировании сжимает в gz-архив.  
-При формировании списка файлов для копирования задействуется "Оценщик".  
-"Оценщик" производит подсчёт необходимого объёма копирования.  
-Список файлов для копирования может занимать значительный объём.  
-В связи с этим был введён параметр -free-space.  
-С помощью -free-space устанавливается пороговый процент от того раздела, на который будет произведено копирование файлов.  
-Если объём файлов превышает этот процент, то "Оценщик" сообщает о превышении порога, и копирование не происходит.  
-По умолчанию порог -free-space установлен в 10%.  
-После выгрузки лог-файлов на мастер-ноду, утилита adbmt формирует оконечный tar.gz.  
-Имя оконечного tar.gz файла будет отображено в стандартном выводе и в лог-файле утилиты adbmt.  
-Например:
+### More details about these three options:
+#### 1. collecting DBMS message logs from the master.  
+When collecting DBMS message logs, the utility collects the corresponding files for the period specified by the -start and -end parameters into the working directory on the master node.  
+The working directory can be overridden with the -dir parameter.  
+By default, this is /tmp.  
+When copying, the utility adbmt compresses uncompressed csv-files into a gz-archive.  
+When forming a list of files to copy, the "Evaluator" is used.  
+The "Evaluator" calculates the required copying volume.  
+The list of log-files to copy can take up a significant amount of space.  
+The -free-space parameter is used for this.  
+The -free-space parameter specifies the threshold percentage of disk space that log-files can occupy.  
+If the file's size exceeds this percentage, then the "Evaluator" reports that the threshold has been exceeded, and copying does not occur.  
+By default, the -free-space threshold is set to 10%.  
+After collecting log-files on the master node, the adbmt utility generates the final tar.gz.  
+The name of the resulting tar.gz file will be displayed in the standard output and in the adbmt utility log file.  
+For example:
 ```
 /tmp/adbmt_master_gpseg-1.tar.gz
 ```
-Для сбора журналов сообщений СУБД необходимо указать параметр -gpseg и задать номер -1.  
-Пример команды:
+To collect DBMS server log files from master, you must specify the -gpseg parameter and set the number to -1.  
+Command example:
 ```
 bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg -1 -start 2015-11-25_09:00 -end 2015-11-25_18:00
 ```
+The current host, where this script is launched considered as master (not standby master).  
+If you need get data from standby master, then you need to launch this script on standby master.  
 
 #### 2. выгрузка журналов сообщений СУБД с сегмента: primary или mirror.  
 Выгрузка журналов с сегмента происходит аналогично выгрузке с мастера.  
@@ -167,111 +169,113 @@ bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end
 
 ## TOOL_OPTIONS:
 ```
-TOOL_OPTIONS:                                        - Текущие значения:
-  -dir                                               /tmp
-    Путь к рабочей директории, в которой будут размещаться временные файлы
-    при сборе, а также оконечный tar.gz. Данная директория не должна иметь
-    в своём названии пробелов.
+TOOL_OPTIONS:                                        - Current values:
+  -dir <DIRECTORY>                                   - $adbmt_tmp
+    Path to the working directory where temporary files
+    will be placed during compilation, as well as the final tar.gz.
+    This directory should not have spaces characters in its name.
 
-  -log
-    Полный путь до лог-файла данного выполняемого скрипта.
-    По умолчанию путь к лог-файлу там, где размещён скрипт adbmt.sh:
-    /tmp/adbmt/adbmt.log
+  -log <FILENAME>                                    - $LOG_FILE
+    Full path to the log file of this executable script.
+    By default, the path to the log is in the $module script location:
+    $LOG_FILE
+    The log file is also copied to the final tar.gz file with diagnostics.
 
   -gpseg <Role_and_ID>
-    Сегмент, из которого необходимо выгрузить журналы сообщений СУБД.
-    Значение Role_and_ID должно состоять из:
-      1. роли сегмента: p - primary, m - mirror.
-      2. номера сегмента.
-    Например: primary-сегмент gpseg10: -gpseg p10
-    Для мастер-ноды используется обозначение -1, т.е.: -gpseg -1
+    The segment to unload the DBMS message logs.
+    The Role_and_ID value must consist of:
+    1. the segment role: p - primary, m - mirror.
+    2. the segment number.
+    For example: primary segment gpseg10: -gpseg p10
+    For the master node the option will be : -gpseg -1
 
-  -start
-    Начальные дата и время для сбора логов.
-    Временная метка должна быть в формате: YYYY-MM-DD_HH:MM
-    Без символов кавычек, пробелов между датой и временем.
-    Если время -start не задано, то используется время,
-    которое было час назад до момента запуска скрипта.
+  -start <YYYY-MM-DD_HH:MM>                          - $start
+    Start date and time for collecting logs.
+    The timestamp must be in the format: YYYY-MM-DD_HH:MM
+    Without quotes, spaces between the date and time.
+    If the -start time is not specified, then the time is used,
+    which was an hour ago before this script was started.
 
-  -end
-    Конечные дата и время для сбора логов.
-    Временная метка должна быть в формате: YYYY-MM-DD_HH:MM
-    Без символов кавычек, пробелов между датой и временем.
-    Если -end не задано, то используется время, которое
-    было в момент запуска скрипта.
+  -end <YYYY-MM-DD_HH:MM>                            - $end
+    End date and time for collecting logs.
+    The timestamp must be in the format: YYYY-MM-DD_HH:MM
+    Without quotes, spaces between the date and time.
+    If -end is not specified, then current time is used.
 
-  -all-hosts
-    Полный путь к файлу со списком всех имён хостов кластера ADB.
-    Если файл не задан, то по умолчанию используется файл:
+  -all-hosts <FILENAME>
+    Full path to a file listing all Arenadata DB cluster hostnames.
+    If the file is not specified, the default file is:
     /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
 
-  -free-space                                        - 10
-    Процент свободного места на разделе с рабочей директорией -dir,
-    который позволено занять собираемым логам с мастера или сегментов.
+  -free-space <PERCENT>                              - $free_spc
+    The percentage of free space on the partition with
+    the working directory -dir, which is allowed to be occupied
+    by the collected logs from the master or segments.
 
   -pxf
-    Собрать конфигурационные файлы и логи PXF.
+    Collect PXF configuration files and logs.
 
   -gpperfmon
-    Собрать информацию с исторических таблиц из БД gpperfmon.
+    Collect historical tables information from the gpperfmon DB.
 
   -adbmon
-    Собрать информацию с таблиц схемы adbmon.
+    Collect information from tables in "adbmon" schema.
 
   -t_audit_top
-    Собрать информацию с таблицы adbmon.t_audit_top.
-    Выгружаемый файл может занимать значительный объём.
-    Поэтому сбор t_audit_top выведен в отдельный параметр.
+    Collect information from the adbmon.t_audit_top table.
+    The downloaded file may be very big.
+    That's why collecting t_audit_top is a separate parameter.
 
-  -db                                                - adb
-    Имя базы данных, где расположена схема adbmon.
+  -db <DATABASE>                                     - $dbname
+    The name of the database where the adbmon schema is located.
 
-  -dbuser                                            - gpadmin
-    Имя суперпользователя БД. На случай, если не gpadmin.
+  -dbuser <DBUSER>                                   - $dbuser
+    Database superuser name. In case it is not gpadmin.
 
-  version
-    Текущая версия программы adbmt.
+  version                                            - $script_version
+    Current version of the programme $module.
 
   -help
-    Показать эту памятку по использованию и выйти.
+    Show this usage help and exit.
 ```
 
-## ПРИМЕРЫ КОМАНД:
-Сбор журналов сообщений СУБД с мастер-ноды:
+## EXAMPLES:
+Collecting DBMS message logs from the master node:
 ```
-bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg -1 -start 2015-11-25_09:00 -end 2015-11-25_18:00
-```
-
-Сбор журналов сообщений СУБД с mirror-сегмента №2:
-```
-bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end 2015-11-25_18:00
+bash $script gp_log_collector -gpseg -1 -start 2015-11-25_09:00 -end 2015-11-25_18:00
 ```
 
-Сбор диагностической информации (без PXF, gpperfmon, adbmon):
+Collecting DBMS message logs from the mirror-segment No 2:
 ```
-bash /tmp/adbmt/adbmt.sh gp_log_collector
-```
-
-Сбор диагностической информации с PXF:
-```
-bash /tmp/adbmt/adbmt.sh gp_log_collector -pxf
+bash $script gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end 2015-11-25_18:00
 ```
 
-Сбор диагностической информации с историей из БД gpperfmon:
+Collecting diagnostic information (without PXF, gpperfmon, adbmon):
 ```
-bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -start 2025-03-19_18:00 -end 2025-03-19_19:00
-```
-
-Сбор диагностической информации с историей из gpperfmon и adbmon:
-```
-bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -adbmon -db dwh -start 2025-03-19_18:00 -end 2025-03-19_19:00
+bash $script gp_log_collector
 ```
 
-Сбор диагностической информации с таблицей t_audit_top:
+Collecting diagnostic information with PXF:
 ```
-bash /tmp/adbmt/adbmt.sh gp_log_collector -t_audit_top -db dwh -start 2025-03-19_18:00 -end 2025-03-19_19:00
+bash $script gp_log_collector -pxf
 ```
 
-Часто необходимо выполнить несколько вариантов сбора.  
-Например: сбор логов с мастера, сбор логов с сегмента, сбор диагностики.  
-В этом случае необходимо последовательно запустить утилиту adbmt.sh в разных вариантах несколько раз.
+Collecting diagnostic with tables from the gpperfmon DB:
+```
+bash $script gp_log_collector -gpperfmon -start 2025-03-19_18:00 -end 2025-03-19_19:00
+```
+
+Collecting diagnostic with tables from the gpperfmon DB and adbmon schema:
+```
+bash $script gp_log_collector -gpperfmon -adbmon -db dwh -start 2025-03-19_18:00 -end 2025-03-19_19:00
+```
+
+Collecting diagnostic with adbmon schema including t_audit_top table:
+```
+bash $script gp_log_collector -t_audit_top -db dwh -start 2025-03-19_18:00 -end 2025-03-19_19:00
+```
+
+It is often necessary to perform several collection varies.  
+For example: to collect logs from the master, collect logs from one segment, collect diagnostics.  
+In this case, it is necessary to run the adbmt.sh utility several times within different options.  
+
