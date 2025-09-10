@@ -52,49 +52,49 @@ bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg -1 -start 2015-11-25_09:00 -end
 The current host, where this script is launched considered as master (not standby master).  
 If you need get data from standby master, then you need to launch this script on standby master.  
 
-#### 2. выгрузка журналов сообщений СУБД с сегмента: primary или mirror.  
-Выгрузка журналов с сегмента происходит аналогично выгрузке с мастера.  
-Для сбора необходимо указать параметр -gpseg, задать роль сегмента буквой p (primary) или m (mirror) и указать номер сегмента.    
-Например, команда для mirror-сегмента 2:
+#### 2. collecting DBMS message logs from segments: primary or mirror.  
+Collecting logs from a segment is similar to collecting from the master.  
+To collect logs, you must specify the -gpseg parameter, set the segment role to "p" (primary) or "m" (mirror), and specify the segment number.  
+For example, here command for mirror-segment number 2:
 ```
 bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end 2015-11-25_18:00
 ```
 
-В самом начале работы утилиты adbmt происходит проверка ssh-соединения с хостами кластера СУБД из списка всех имён хостов кластера ADB.  
-Полный путь к файлу со списком всех имён хостов кластера ADB задаётся параметром -all-hosts.  
-Если список не задан, то по умолчанию используется файл:
+When the adbmt utility starts working, it checks ssh connections to the DBMS cluster hosts from the list of all ADB cluster host names.  
+The full path to the file with the list of all ADB cluster host names is specified by the -all-hosts parameter.  
+If the list is not specified, then the file is used by default:
 ```
 /home/gpadmin/arenadata_configs/arenadata_all_hosts.hosts
 ```
-По результатам проверки ssh-соединения создаётся файл хостов, к которым есть доступ по ssh.  
-Имя файла: available_hosts.hosts.
+Based on the results of the ssh connection check, a file of hosts is created that can be accessed via ssh.  
+Filename is: available_hosts.hosts.  
 
-#### 3. Сбор диагностической информации состоит из сбора:  
-- 3.1. динамической информации - 1-й снимок.
-- 3.2. статической информации.
-- 3.3. информации PXF (опционально).
-- 3.4. информации из базы gpperfmon (опционально). Может быть собрана, если установлен gpperfmon.
-- 3.5. информации из схемы adbmon (опционально). Может быть собрана, если установлен adbmon.
-- 3.6. динамической информации - 2-й снимок.
+#### 3. The collection of diagnostic information consists of collecting:  
+- 3.1. dynamic information - 1st snapshot.
+- 3.2. static information.
+- 3.3. PXF information (optional).
+- 3.4. gpperfmon database information (optional). Can be collected if gpperfmon is installed.
+- 3.5. adbmon schema information (optional). Can be collected if adbmon is installed.
+- 3.6. dynamic information - 2nd snapshot.
 
-3.1. Сбор динамической информации состоит из двух снимков.  
-Динамическая информация имеет смысл для оценки её во времени.  
-Например, это оценка роста сетевых ошибок, роста потребления ресурсов процессами, ресурсными группами и т.д.  
-Собираются такие данные:
+3.1. Dynamic information collection consists of two snapshots.  
+Dynamic information makes sense for its evaluation over time.  
+For example, an assessment of the growth of network errors, the growth of resource consumption by processes, resource groups, etc.  
+The following data are collected:
   - ps axuww
   - /sbin/ifconfig
   - netstat -s
-  - динамические SQL-запросы:
+  - dynamic SQL-queries:
     - gp_toolkit.gp_resgroup_status
     - gp_toolkit.gp_resgroup_status_per_host
     - pg_locks
     - pg_stat_activity
 
-Номер снимка (1-й или 2-й) будет записан вначале файла, например:  
+The snapshot number (1st or 2nd) will be set at the beginning of the file, for example:  
 1.ps_axuww_2025-01-01_08-00-00.csv.gz  
 
-3.2. Сбор статической информации состоит из сбора:
-  - статические SQL-запросы:
+3.2. Collection of static information consists of collecting:
+  - static SQL-queries:
     - gp_server_version
     - postmaster_uptime
     - postmaster_stat
@@ -103,12 +103,12 @@ bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end
     - pg_db_role_setting
     - gp_segment_configuration
     - gp_configuration_history
-  - логи сервисных утилит ADB и analyzedb:
+  - ADB service utilities logs and analyzedb logs:
     - adb_collected_info
     - gpAdminLogs
     - operation_log
     - db_analyze
-  - различные конфиг-файлы и вывод утилит ОС:
+  - different config files and output of OS utilities:
     - os-release, os-version
     - /etc/security/limits.conf
     - /etc/sysctl.conf
@@ -126,15 +126,15 @@ bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end
   - startup.log
   - sar-файлы
   - postgresql.conf
-  - Проверка проходимости пакетов с MTU 9000:
+  - Checking the throughput of frames with MTU 9000:
     - test_ping_to_master.log.gz
     - test_ping_from_master.log.gz
 
-3.3. с помощью опции -pxf задаётся дополнительный сбор PXF:
-  - конфигураций PXF - pxf_conf_\<TIMESTAMP\>.tar.gz
-  - лог-файлов PXF - pxf_logs_\<TIMESTAMP\>.tar.gz
+3.3. by the -pxf option additional PXF collection is specified:
+  - PXF configuration - pxf_conf_\<TIMESTAMP\>.tar.gz
+  - PXF log-files - pxf_logs_\<TIMESTAMP\>.tar.gz
 
-3.4. с помощью опции -gpperfmon задаётся дополнительный сбор из исторических таблиц базы данных gpperfmon:
+3.4. by the -gpperfmon option additional collection from historical tables of the gpperfmon database is specified:
   - gpperfmon.database_history.csv.gz
   - gpperfmon.diskspace_history.csv.gz
   - gpperfmon.log_alert_history.csv.gz
@@ -144,7 +144,7 @@ bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end
   - gpperfmon.socket_history.csv.gz
   - gpperfmon.system_history.csv.gz
 
-3.5. с помощью опции -adbmon задаётся дополнительный сбор из таблиц схемы adbmon:
+3.5. by the -adbmon option additional collection from admon schema tables is specified:
   - t_audit_gp_resgroup_status.csv.gz
   - t_audit_gp_resgroup_status_per_seg.csv.gz
   - t_audit_locks_usage.csv.gz
@@ -152,17 +152,17 @@ bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg m2 -start 2015-11-25_09:00 -end
   - t_audit_pg_stat_activity.csv.gz
   - t_audit_top.csv.gz
 
-3.6. Сбор динамической информации 2-й снимок - это повторный сбор информации, указанной в пункте 3.1.  
-Номер снимка будет записан вначале файла, например:
+3.6. Dynamic information collection second snapshot is the second collection of the information specified in clause 3.1.  
+The snapshot number will be set at the beginning of the file, for example:
 ```
 2.ps_axuww_2025-01-01_08-10-00.csv.gz
 ```
 
-Диагностические файлы собираются на мастер-ноду в рабочую директорию указанную параметром -dir.  
-После сбора файлов утилита adbmt формирует оконечный tar.gz.  
-Имя оконечного tar.gz файла состоит из имени утилиты adbmt и времени запуска утилиты.  
-Имя файла будет отображено в стандартном выводе и в лог-файле утилиты adbmt.  
-Например:
+Diagnostic files are collected to the master node into the working directory specified by the -dir option.
+After collecting the files, the adbmt utility makes the final tar.gz.  
+The name of the final tar.gz file consists of the name of the adbmt utility and the time, when adbmt utility was started.  
+The file name will be displayed in the standard output and also in the adbmt utility log file.  
+For example:
 ```
 /tmp/adbmt_2025-01-01_08-00-00.tar.gz
 ```
@@ -236,7 +236,10 @@ TOOL_OPTIONS:                                        - Current values:
     Current version of the programme $module.
 
   -help
-    Show this usage help and exit.
+    Show this usage help in english and exit.
+
+  -help-ru
+    Show this usage help in russian and exit.
 ```
 
 ## EXAMPLES:

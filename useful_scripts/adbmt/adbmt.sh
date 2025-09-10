@@ -13,7 +13,6 @@ scrpt_fn=${module%".sh"}              # scriptname without .sh
 declare -a argv=( $* )                # puts argues from CLI into array
 LOG_FILE=$current_path/$scrpt_fn.log  # path to directory log filename
 
-# TODO: отрегулировать различные exit. Если внутри функции - то return.
 
 func_make_dtm() {  # add date time to every line in $LOG_FILE
   while IFS= read -r line; do
@@ -48,7 +47,8 @@ func_main() {  # main function: invokes another functions
 
 
 func_show_help(){  # show using help
-  eval "echo \"$(< $current_path/adbmt.ru.help)\""
+  local lang="$1"
+  eval "echo \"$(< $current_path/adbmt.${lang}.help)\""
   exit 0
 }
 
@@ -97,7 +97,8 @@ func_get_arguments() {  # writes into variables argues from CLI
                                   dbuser="${argv[$i+1]}"
                                 fi;;
     version )                   echo $script_version; exit 0;;
-    -help | --help )            func_show_help; exit 0;;
+    -help | --help )            func_show_help en; exit 0;;
+    -help-ru | --help-ru )      func_show_help ru; exit 0;;
     esac
   done
 }
@@ -251,7 +252,7 @@ func_prepare() {  # prepare before getting data
                           -c gp_interconnect_type=tcp               \
                          ' \
                 "          \
-                -t 2>&1    \
+                -t -q 2>&1 \
                 -f $current_path/adbmt_queue.sql
   )
 
@@ -329,11 +330,12 @@ func_gp_log_collector() {  # gp_log_collector tool
 
   if [[ -n $gpseg ]]; then
 
+    echo "--- Script adbmt_pg_log.sh started. ---"
     # get log-files from master or from segment
     bash ${current_path}/adbmt_pg_log.sh $start $end ${adbmt_dir} \
       -gpseg $gpseg -free-space $free_spc -all-hosts $all_hosts
     pg_log_result=$?
-    echo "Script adbmt_pg_log.sh finished."
+    echo "--- Script adbmt_pg_log.sh finished. ---"
     if (( pg_log_result != 0 )); then
       echo "ERROR: Errors occurred while copying log files, check file: "$LOG_FILE
       exit 8

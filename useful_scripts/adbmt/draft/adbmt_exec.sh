@@ -5,14 +5,13 @@
 # adbmt_exec upload script on master node and executes adbmt.sh
 
 ssh_user=avas
-# host=avas-cdwm1      # Centos
-host=10.92.5.181     # Astra
+host=avas-cdwm1      # Centos
+# host=10.92.5.181     # Astra
 # host=10.92.5.36      # Ubuntu
 # host=10.92.36.197    # Alt Linux
 
 # host=10.92.35.104    # Vit
 # ssh_user=vzh
-
 
 
 scr_dir=/p/pg_gp_utils/useful_scripts
@@ -38,8 +37,8 @@ EOF
       # sudo -iu gpadmin
       su - gpadmin
         echo пользователь: $(whoami)
-        # bash /tmp/adbmt/adbmt.sh gp_log_collector -gpseg -1 -start 2025-08-21_00:01 -end 2025-09-02_16:59
-        bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf
+        # bash /tmp/adbmt/adbmt.sh gp_log_collector -free-space 10 -gpseg p0 -start 2025-07-21_00:01 -end 2025-09-10_16:59
+        bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf -t_audit_top -db inc0025383 -start 2025-07-20_00:01 -end 2025-07-22_13:59
 exit 0
 exit 0
 exit 0
@@ -96,10 +95,6 @@ exit 0
   # -regex '.*/(master|mirror|primary)/gpseg[^/]*' \
   # -print 2>/dev/null"
 
-
-# TODO: сделать сбор от root (??): сложность - заморочка с root
-# - sar
-# - /var/log messages, kern.log, syslog
 
 # TODO: для опции сбора core-файлов проверять то, что:
 # lsof, strace, pstack, gcore, gdb must be installed on all all hosts.

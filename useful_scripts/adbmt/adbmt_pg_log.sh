@@ -1,50 +1,47 @@
 #!/bin/bash
+
+# DESCRIPTION -------------------------------------------------------- #
 # adbmt_pg_log.sh
-# Сбор логов ADB из pg_log на удалённом сегменте за временной период
-# Функционал:
-# - параметр -gpseg (master/primary/mirror),
-# - поиск по номеру сегмента имени хоста и pg_log_path,
-# - сжатие csv-файлов при копировании,
-# - оценка объёма скачивания,
-# - --dry-run
+# Collect ADB server logs from a remote host for a specified period of time
 
-set -euo pipefail   # чат предложил поставить такую хрень
-
-## ------------ Глобальные переменные (по умолчанию пустые) ----------------- ##
-START_STR=""
-END_STR=""
-ADBMT_DIR=""
+## Defining global variables ---------------------------------------- ##
+# Options:
+start_str=""
+end_str=""
+adbmt_tmp=""
 gpseg_opt=""                # -1 | N | pN | mN
 free_spc="10"               # free space on disk in percents
-DRY_RUN="0"                 # if --dry-run is 1 - means do not copy files
+dry_run="0"                 # if --dry-run is 1 - means do not copy files
 
-# Файл с хостами кластера СУБД:
+# list of host files in DBMS cluster
 PATH_ARENADATA_CONFIGS="${PATH_ARENADATA_CONFIGS:-}"
 all_hosts="${PATH_ARENADATA_CONFIGS}/arenadata_all_hosts.hosts"
 
-# Вычисляемые параметры:
-ROLE=""                     # master|primary|mirror
-GPSEG=""                    # -1 для master, иначе gpseg >= 0
-SEG_HOST=""                 # имя хоста на котором расположен сегмент
-PG_LOG_PATH=""              # полный путь к pg_log сегмента
+seg_role=""                 # master|primary|mirror
+seg_num=""                  # -1 for master, otherwise must be gpseg >= 0
+seg_host=""                 # hostname, which segment is located
+seg_path=""                 # full path to segment's pg_log
 
-# Массивы и счётчики:
+DEBUG="${DEBUG:-0}"         # value 1 is for debug
+
+# Arrays:
 FILES=()
 STARTS=()
 ENDS=()
 SELECTED=()
+# Counters:
 EST_RATIO_NUM=""
 EST_RATIO_DEN=""
-ESTIMATED_GZ_TOTAL=""
-PLANNED_BYTES=""
-TOTAL_SRC_BYTES=0
-TOTAL_GZ_BYTES=0
-
-## --------------------------- Вспомогательные ------------------------------ ##
-DEBUG="${DEBUG:-0}"  # 1 = подробная отладка
+est_gz_total=""
+EST_RATIO_NUM=""
+total_src_bytes=0
+total_gz_bytes=0
 
 
-func_main() {  ## Главная функция ------------------------------------------- ##
+# set -Eeuo pipefail
+
+
+func_main() {  # main function: invokes another functions
   func_get_arguments "$@"
   func_parse_gpseg
   func_resolve_seg_host_and_path
@@ -55,46 +52,33 @@ func_main() {  ## Главная функция --------------------------------
   func_estimate_planned_bytes
   func_check_free_space
 
-  if (( DRY_RUN != 1 )); then
+  if (( dry_run != 1 )); then
     func_copy_with_compression
   fi
   func_print_summary
 }
 
 
-## --------- Функции вывода сообщений на экран ------------------------------ ##
-func_log_ts()  { date +'%F %T'; }
-
-func_dbg() {                      # видно только с --debug
-  if [[ $DEBUG == 1 ]]; then
-    echo "DEBUG: $*"
-  fi
+f_prt() {  # writes to stdout errors, debug or info messages
+  case $1 in
+  err ) echo "ERROR: "$2;;
+  dbg ) ((DEBUG == 1)) && echo "DEBUG: "$2;;
+  *   ) echo $1;;
+  esac
 }
 
 
-func_prt_inf() {               # всегда видно, даже без --debug
-  echo "INFO: $*"
-}
-
-
-func_prt_err() {
-  echo "ERROR: $*"
-}
-## --------- Конец: Функции вывода сообщений на экран ----------------------- ##
-
-
-
-func_print_usage() {
+func_show_help() {
   cat <<EOF
 Использование:
-  $0 START END ADBMT_DIR -gpseg <N|pN|mN|-1> [-free-space PCT] [--dry-run]
+  $0 start end adbmt_tmp -gpseg <N|pN|mN|-1> [-free-space PCT] [--dry-run]
 
 Где:
-  START/END     : YYYY-MM-DD_HH:MM (HH=00..23, MM=00..59)
-  ADBMT_DIR     : локальный каталог назначения
+  start/end     : YYYY-MM-DD_HH:MM (HH=00..23, MM=00..59)
+  adbmt_tmp     : локальный каталог назначения
   -gpseg        : -1 (master) | N/pN (primary) | mN (mirror), где N>=0
   -free-space   : порог доли свободного места в % (по умолчанию 10)
-  --dry-run     : только расчёт и список, без сжатия и копирования
+  --dry-run     : только расчёт и список - без сжатия и копирования
 EOF
 }
 
@@ -124,19 +108,20 @@ func_df_avail_and_target() {  # echo "<bytes> <mount>"
 
 
 func_get_arguments() {  # writes into variables argues from CLI
-  if (( $# < 4 )); then func_print_usage; exit 1; fi
+  if (( $# < 4 )); then func_show_help; exit 1; fi
 
-  START_STR="$1"; END_STR="$2"; ADBMT_DIR="$3"; shift 3
+  start_str="$1"; end_str="$2"; adbmt_tmp="$3"; shift 3
 
   while (( $# )); do
     case "$1" in
-      -gpseg|--gpseg)           shift; gpseg_opt="${1:-}";;
-      -free-space|--free-space) shift; free_spc="${1:-}";;
-      -all-hosts|--all-hosts)   shift; all_hosts="${1:-}";;
-      -dry-run|--dry-run)       DRY_RUN="1";;
-      -h|--help)                func_print_usage; exit 0;;
-      -debug|--debug)           DEBUG="1";;
-      *) func_prt_err "Unknown option: $1"; func_print_usage; exit 1;;
+      -gpseg|--gpseg)               shift; gpseg_opt="${1:-}";;
+      -free-space|--free-space)     shift; free_spc="${1:-}" ;;
+      -all-hosts|--all-hosts)       shift; all_hosts="${1:-}";;
+      -dry-run|--dry-run)           dry_run=1;;
+      -h|--help)                    func_show_help; exit 0;;
+      -debug|--debug)               DEBUG=1;;
+      *)                            f_prt err "Unknown option: $1";
+                                    func_show_help; exit 1;;
     esac
     shift || true
   done
@@ -145,97 +130,101 @@ func_get_arguments() {  # writes into variables argues from CLI
 }
 
 
-func_check_args() {  # проверить входные аргументы -------------------------- ##
+func_check_args() {  # check input arguments
   if [[ ! -n "$gpseg_opt" ]]; then
-    func_prt_err "Option -gpseg is necessary"
+    f_prt err "Option -gpseg is necessary"
     exit 1
   fi
   if [[ ! "$free_spc" =~ ^([0-9]+)(\.[0-9]+)?$ ]]; then
-    func_prt_err "-free-space must be numeric"
+    f_prt err "-free-space must be numeric"
     exit 1
   fi
-  if ! func_validate_datetime_strict "$START_STR"; then
-    func_prt_err "Incorrect start: $START_STR"
+  if ! func_validate_datetime_strict "$start_str"; then
+    f_prt err "Incorrect start: $start_str"
     exit 1
   fi
-  if ! func_validate_datetime_strict "$END_STR"; then
-    func_prt_err "Incorrect end: $END_STR"
+  if ! func_validate_datetime_strict "$end_str"; then
+    f_prt err "Incorrect end: $end_str"
     exit 1
   fi
   if [[ ! -r "$all_hosts" ]]; then
-    func_prt_err "DBMS cluster hosts file not found: $all_hosts"
+    f_prt err "DBMS cluster hosts file not found: $all_hosts"
     exit 1
   fi
 }
 
 
-func_parse_gpseg() {  ## Разбор -gpseg на ROLE и номер сегмента ------------- ##
+func_parse_gpseg() {  # Parsing -gpseg into role and segment_number
   local s="$gpseg_opt"
 
   if [[ "$s" =~ ^-?[0-9]+$ ]]; then
     if [[ "$s" == "-1" ]]; then
-      ROLE="master"
+      seg_role="master"
     else
-      ROLE="primary"
+      seg_role="primary"
     fi
-    GPSEG="$s"
+    seg_num="$s"
   elif [[ "$s" =~ ^[Pp]([0-9]+)$ ]]; then
-    ROLE="primary"
-    GPSEG="${BASH_REMATCH[1]}"
+    seg_role="primary"
+    seg_num="${BASH_REMATCH[1]}"
   elif [[ "$s" =~ ^[Mm]([0-9]+)$ ]]; then
-    ROLE="mirror"
-    GPSEG="${BASH_REMATCH[1]}"
+    seg_role="mirror"
+    seg_num="${BASH_REMATCH[1]}"
   else
-    func_prt_err "Incorrect -gpseg: $s (expected -1 | N | pN | mN)"
+    f_prt err "Incorrect -gpseg: $s (expected -1 | N | pN | mN)"
     exit 1
   fi
 
-  if [[ "$ROLE" != "master" ]]; then
-    [[ "$GPSEG" =~ ^[0-9]+$ ]] || \
-      { func_prt_err "gpseg must be >=0"; exit 1; }
+  if [[ "$seg_role" != "master" ]]; then
+    [[ "$seg_num" =~ ^[0-9]+$ ]] || \
+      { f_prt err "gpseg must be >=0"; exit 1; }
   else
-    [[ "$GPSEG" == "-1" ]] || \
-    { func_prt_err "For master-node use options -gpseg -1"; exit 1; }
+    [[ "$seg_num" == "-1" ]] ||     \
+      { f_prt err "For master-node use options -gpseg -1"; exit 1; }
   fi
 }
 
 
-func_debug_remote_probe() {  # быстрая проверка удалённо
+func_debug_remote_probe() {  # fast debug check
   ((DEBUG == 1)) || return 0
-  func_dbg "Check ls/stat on ${SEG_HOST}:${PG_LOG_PATH}"
-  ssh "$SEG_HOST" "set -e; printf 'REMOTE whoami: '; whoami; \
-     printf 'REMOTE shell : '; echo \"\$SHELL\"; \
-     printf 'REMOTE find : '; command -v find || true; \
-     printf 'REMOTE dir  : '; ls -ld -- '""$PG_LOG_PATH""' || true; \
-     printf 'CSV.gz count: '; find '""$PG_LOG_PATH""' -maxdepth 1 -type f -name 'gpdb-*.csv.gz' | wc -l; \
-     printf 'CSV    count: '; find '""$PG_LOG_PATH""' -maxdepth 1 -type f -name 'gpdb-*.csv'    | wc -l; \
-     printf 'CSV.gz head :\n'; find '""$PG_LOG_PATH""' -maxdepth 1 -type f -name 'gpdb-*.csv.gz' -printf '%f\n' | head -5 | sed -n '1,5p'; \
-     true"
+  f_prt dbg "Check ls/stat on ${seg_host}:${seg_path}"
+  ssh "$seg_host" "set -e; printf 'REMOTE whoami: '; whoami;           \
+     printf 'REMOTE shell : '; echo \"\$SHELL\";                       \
+     printf 'REMOTE find : ';  command -v find || true;                \
+     printf 'REMOTE dir  : ';  ls -ld -- '""$seg_path""' || true;      \
+     printf 'CSV.gz count: ';  find '""$seg_path""'                    \
+            -maxdepth 1 -type f -name 'gpdb-*.csv.gz' | wc -l;         \
+     printf 'CSV    count: ';  find '""$seg_path""'                    \
+            -maxdepth 1 -type f -name 'gpdb-*.csv'    | wc -l;         \
+     printf 'CSV.gz head :\n'; find '""$seg_path""'                    \
+            -maxdepth 1 -type f -name 'gpdb-*.csv.gz' -printf '%f\n' | \
+              head -5 | sed -n '1,5p'; true
+    "
 }
 
 
-func_resolve_seg_host_and_path() {  ## Определение SEG_HOST и PG_LOG_PATH --- ##
-  # ищем путь вида */<role>/gpseg<GPSEG>/pg_log
+func_resolve_seg_host_and_path() {  # search seg_host и seg_path
+  # find path like */<role>/gpseg<seg_num>/pg_log
   local cmd="find / -xdev \( \
     -path /proc -o -path /sys -o -path /run -o -path /dev \) \
-    -prune -o -regextype posix-extended \
-    -regex '.*/(${ROLE})/gpseg(${GPSEG})/pg_log' \
+    -prune -o -regextype posix-extended                      \
+    -regex '.*/(${seg_role})/gpseg(${seg_num})/pg_log'       \
     -print 2>/dev/null"
 
-  echo role=$ROLE
-  echo GPSEG=$GPSEG
-  echo all_hosts=${all_hosts}
+  echo "seg_role="${seg_role}
+  echo "seg_num="${seg_num}
+  echo "all_hosts="${all_hosts}
 
-  if ((GPSEG == -1)); then
-    hosts_clause="-h $(hostname)"
+  if ((seg_num == -1)); then
+    hosts_clause="-h $(hostname)"  # line for master
   else
-    hosts_clause="-f $all_hosts"
+    hosts_clause="-f $all_hosts"   # line for segment
   fi
-  local line  # берем первую найденную строку
+  local line  # get fist founded line
   line="$(gpssh ${hosts_clause} "$cmd" 2>/dev/null | \
-            grep "/${ROLE}/gpseg${GPSEG}/pg_log" | head -n1 || true)"
+            grep "/${seg_role}/gpseg${seg_num}/pg_log" | head -n1 || true)"
 
-  # убрать символы CR/LF и лишние табы/пробелы
+  # remove symbols CR/LF and redundant tab and spaces
   line="$(printf '%s' "$line" | tr -d '\r' )"
   line="${line//$'\t'/ }"
   line="${line%$'\n'}"
@@ -243,63 +232,56 @@ func_resolve_seg_host_and_path() {  ## Определение SEG_HOST и PG_LOG
 
   # Usually gpssh format is: [host.name] /path/to/.../pg_log
   # But sometimes format is: [ host.name] /path/to/.../pg_log
-  # SEG_HOST="$(sed -n 's/^\[\([^]]\+\)\].*/\1/p' <<<"$line")"
-  SEG_HOST="$(echo ${line} | \
+  seg_host="$(echo ${line} | \
     sed -nE 's/^\[[[:space:]]*([^[:space:]]+)[[:space:]]*].*/\1/p')"
-  # PG_LOG_PATH="$(awk '{print $2}' <<<"$line")"
-  PG_LOG_PATH="$(echo ${line} | cut -d ']' -f 2 | tr -d ' ')"
-  echo SEG_HOST=$SEG_HOST
-  echo PG_LOG_PATH=$PG_LOG_PATH
+  seg_path="$(echo ${line} | cut -d ']' -f 2 | tr -d ' ')"
+  echo seg_host=$seg_host
+  echo seg_path=$seg_path
 
-  # ещё раз подчистим на всякий случай
-  SEG_HOST="$(printf '%s' "$SEG_HOST" | tr -d '\r\n')"
-  PG_LOG_PATH="$(printf '%s' "$PG_LOG_PATH" | tr -d '\r\n')"
+  # Let's clean it up again just in case
+  seg_host="$(printf '%s' "$seg_host" | tr -d '\r\n')"
+  seg_path="$(printf '%s' "$seg_path" | tr -d '\r\n')"
 
-  [[ -n "$SEG_HOST" && -n "$PG_LOG_PATH" ]] || { \
-      func_prt_err "Failed to parse seg_host/PG_LOG_PATH from gpssh out"
+  [[ -n "$seg_host" && -n "$seg_path" ]] || { \
+      f_prt err "Failed to parse seg_host/seg_path from gpssh out"
       exit 1
     }
 
-  func_prt_inf "--- Defined for download ---"
-  func_prt_inf "HOST: host=${SEG_HOST}"
-  func_prt_inf "PATH: pg_log_path=${PG_LOG_PATH}"
-
-  if ((DEBUG == 1)); then  # показать "HEX" пути, чтобы сразу видно было хвосты
-    printf '%s - DEBUG: PG_LOG_PATH HEX: ' "$(func_log_ts)"
-    printf '%s' "$PG_LOG_PATH" | od -An -t x1
-    # Если и тут NO_DIR - значит путь ещё грязный
-    func_dbg "Check directory availability on remote host"
-    ssh "$SEG_HOST" "ls -ld -- '$PG_LOG_PATH' || echo 'NO_DIR'"
-  fi
+  f_prt "--- Defined for download ---"
+  f_prt "HOST: host=${seg_host}"
+  f_prt "PATH: seg_path=${seg_path}"
 }
 
 
-func_remote_scan_and_build_intervals() {  # Сканирование файлов на хосте по ssh
+func_remote_scan_and_build_intervals() {  # Scan files on host via ssh
   local -a files_raw=()
   local -a entries=()
 
-  # 1) Сырой список имён (две find без скобок, сортировка на удалённой стороне)
-  func_dbg "Запрашиваю список файлов по ssh ..."
+  # 1) Raw list of names
+  f_prt dbg "Запрашиваю список файлов по ssh ..."
   mapfile -t files_raw < <(
-    ssh "$SEG_HOST" "{ \
-        LC_ALL=C find '""$PG_LOG_PATH""' -maxdepth 1 -type f -name 'gpdb-*.csv'    -printf '%f\n'; \
-        LC_ALL=C find '""$PG_LOG_PATH""' -maxdepth 1 -type f -name 'gpdb-*.csv.gz' -printf '%f\n'; \
+    ssh "$seg_host" "{ \
+        LC_ALL=C find '""$seg_path""' -maxdepth 1 -type f                   \
+                                      -name 'gpdb-*.csv' -printf '%f\n';    \
+        LC_ALL=C find '""$seg_path""' -maxdepth 1 -type f                   \
+                                      -name 'gpdb-*.csv.gz' -printf '%f\n'; \
       } 2>/dev/null | LC_ALL=C sort" \
     | tr -d $'\r'
   ) || true
 
-  func_dbg "Получено строк: ${#files_raw[@]}"
+  f_prt dbg "Получено строк: ${#files_raw[@]}"
   if ((DEBUG == 1)); then
     printf '%s - DEBUG: RAW[1..5]:\n  %s\n  %s\n  %s\n  %s\n  %s\n' \
-      "$(func_log_ts)" "${files_raw[0]:-}" "${files_raw[1]:-}" "${files_raw[2]:-}" "${files_raw[3]:-}" "${files_raw[4]:-}"
+      "$(date +'%F %T')" "${files_raw[0]:-}" "${files_raw[1]:-}"    \
+      "${files_raw[2]:-}" "${files_raw[3]:-}" "${files_raw[4]:-}"
   fi
 
   if ((${#files_raw[@]}==0)); then
-    func_prt_inf "В $SEG_HOST:$PG_LOG_PATH нет файлов gpdb-*.csv(.gz)"
+    f_prt "В $seg_host:$seg_path нет файлов gpdb-*.csv(.gz)"
     exit 2
   fi
 
-  # 2) Преобразуем в (epoch\tfile), сортируем по времени
+  # 2) Convert list to "epoch\tfile", sort by time
   mapfile -t entries < <(
     for f in "${files_raw[@]}"; do
       f="${f%$'\r'}"; f="${f//$'\n'/}"
@@ -307,24 +289,20 @@ func_remote_scan_and_build_intervals() {  # Сканирование файло�
       ts="${ts%.csv.gz}"; ts="${ts%.csv}"
       date_part="${ts%_*}"; hms="${ts#*_}"
       [[ ${#hms} -eq 6 ]] || \
-        { func_dbg "Пропуск «$f» (hms='${hms}', len=${#hms})"; continue; }
+        { f_prt dbg "Пропуск $f (hms='${hms}', len=${#hms})"; continue; }
       hh=${hms:0:2}; mm=${hms:2:2}; ss=${hms:4:2}
       ep="$(date -d "${date_part} ${hh}:${mm}:${ss}" +%s 2>/dev/null)" || \
-        { func_dbg "date не распарсил «$f»"; continue; }
+        { f_prt dbg "date не распарсил $f"; continue; }
       printf "%s\t%s\n" "$ep" "$f"
     done | LC_ALL=C sort -n
   ) || true
 
-  func_dbg "Валидных записей после парсинга: ${#entries[@]}"
+  f_prt dbg "Валидных записей после парсинга: ${#entries[@]}"
 
   if ((${#entries[@]}==0)); then
-    func_prt_inf "В $SEG_HOST:$PG_LOG_PATH нет корректных файлов (имя не распозналось)"
+    f_prt "В $seg_host:$seg_path нет корректных файлов (имя не распозналось)"
     exit 2
   fi
-
-  FILES=()
-  STARTS=()
-  ENDS=()
 
   for line in "${entries[@]}"; do
     STARTS+=( "${line%%$'\t'*}" )
@@ -337,19 +315,20 @@ func_remote_scan_and_build_intervals() {  # Сканирование файло�
     else
       ENDS[i]=$(date -d '2100-01-01 00:00:00' +%s)
     fi
-    func_dbg "INTVL ${FILES[i]}: $(date -d @${STARTS[i]} +'%F %T') .. $(date -d @${ENDS[i]} +'%F %T')"
+    f_prt dbg "INTVL ${FILES[i]}: $(date -d @${STARTS[i]} +'%F %T') .. $(date -d @${ENDS[i]} +'%F %T')"
   done
 }
 
 
-func_select_files_by_range() {  ## Отбор по интервалу ----------------------- ##
+func_select_files_by_range() {  # Selection by time range
   local start_epoch end_epoch
-  start_epoch="$(func_epoch_from_minute "$START_STR")"
-  end_epoch=$(( $(func_epoch_from_minute "$END_STR") + 59 ))
-  (( start_epoch <= end_epoch )) || \
-    { func_prt_err "start > end"; exit 1; }
-
+  start_epoch="$(func_epoch_from_minute "$start_str")"
+  end_epoch=$(( $(func_epoch_from_minute "$end_str") + 59 ))
   SELECTED=()
+
+  (( start_epoch <= end_epoch )) || \
+    { f_prt err "start > end"; exit 1; }
+
   for ((i=0; i<${#FILES[@]}; i++)); do
     local si="${STARTS[i]}" ei="${ENDS[i]}"
     if (( si <= end_epoch && ei >= start_epoch )); then
@@ -357,12 +336,12 @@ func_select_files_by_range() {  ## Отбор по интервалу ----------
     fi
   done
   ((${#SELECTED[@]})) || \
-    { func_prt_inf "Не найдено файлов, пересекающихся с интервалом [$START_STR .. $END_STR]."; exit 3; }
+    { f_prt "Не найдено файлов, пересекающихся с интервалом [$start_str .. $end_str]."; exit 3; }
 }
 
 
-func_pick_sample_and_estimate_ratio() {  ## Оценщик степени сжатия csv.gz --- ##
-  smpl_bytes=$((32 * 1024 * 1024))  # 32 MiB in bytes for sample
+func_pick_sample_and_estimate_ratio() {  # csv.gz Compression Ratio Evaluator
+  smpl_bytes=$((32 * 1024 * 1024))       # 32 MiB in bytes for sample
   EST_RATIO_NUM=""
   EST_RATIO_DEN=""
   local sample=""
@@ -371,117 +350,144 @@ func_pick_sample_and_estimate_ratio() {  ## Оценщик степени сжа
 
   for f in "${SELECTED[@]}"; do
     [[ "$f" == *.csv ]] || continue
-    osz="$(ssh "$SEG_HOST" "stat -c%s -- '$PG_LOG_PATH/$f'" | tr -d '[:space:]' || true)"
+    osz="$(ssh "$seg_host" "stat -c%s -- '$seg_path/$f'" | \
+           tr -d '[:space:]' || true)"
     [[ "$osz" =~ ^[0-9]+$ ]] || continue
-    sample="$f"; size="$osz"; break  # достаточно любого csv
+    sample="$f"; size="$osz"; break
   done
 
   if [[ -n "$sample" ]]; then
     local take="$size"; (( take > smpl_bytes )) && take="$smpl_bytes"
     local comp_sample
-    comp_sample="$(ssh "$SEG_HOST" "head -c $take -- '$PG_LOG_PATH/$sample' | gzip -c | wc -c" | tr -d '[:space:]')"
+    comp_sample="$(ssh "$seg_host" "head -c $take -- '$seg_path/$sample' | \
+                     gzip -c | wc -c" | tr -d '[:space:]')"
     EST_RATIO_NUM="$comp_sample"; EST_RATIO_DEN="$take"
     local pct factor
-    pct=$(awk -v n="$EST_RATIO_NUM" -v d="$EST_RATIO_DEN" 'BEGIN{printf "%.1f", 100*n/d}')
-    factor=$(awk -v n="$EST_RATIO_NUM" -v d="$EST_RATIO_DEN" 'BEGIN{printf "%.2f", d/n}')
-    func_dbg "Оценка сжатия по образцу: ${SEG_HOST}:${PG_LOG_PATH}/${sample}"
-    func_dbg "Использовано выборки для оценщика: $take байт из $size"
-    func_dbg "Оценочное отношение: ~${pct}% от исходного (≈${factor}x меньше)"
+    pct=$(awk -v n="$EST_RATIO_NUM"    \
+              -v d="$EST_RATIO_DEN"    \
+              'BEGIN{printf "%.1f", 100*n/d}')
+    factor=$(awk -v n="$EST_RATIO_NUM" \
+                 -v d="$EST_RATIO_DEN" \
+                 'BEGIN{printf "%.2f", d/n}')
+    f_prt dbg "Оценка сжатия по образцу: ${seg_host}:${seg_path}/${sample}"
+    f_prt dbg "Использовано выборки для оценщика: $take байт из $size"
+    f_prt dbg "Оценочное отношение: ~${pct}% от исходного (~${factor}x меньше)"
   else
-    func_prt_inf "Оценка: среди выбранных файлов нет несжатых csv - пропускаю оценщик."
+    f_prt "Оценка: среди выбранных файлов нет несжатых csv - пропускаю оценщик."
   fi
 }
 
 
-func_estimate_planned_bytes() { ## Оценка планируемого объёма лог-файлов ---- ##
+func_estimate_planned_bytes() { # Evaluation of the planned volume of log files
   local est_total=0
-  TOTAL_SRC_BYTES=0
+  total_src_bytes=0
 
   for f in "${SELECTED[@]}"; do
-    local src="$PG_LOG_PATH/$f"
+    local src="$seg_path/$f"
     local osz
-    # берём размер удалённого файла
-    osz="$(ssh -T "$SEG_HOST" "stat -c%s -- '$src'" 2>/dev/null | tr -d '[:space:]')"
+    # take size of file
+    osz="$(ssh -T "$seg_host" "stat -c%s -- '$src'" 2>/dev/null | \
+           tr -d '[:space:]')"
     [[ "$osz" =~ ^[0-9]+$ ]] || osz=0
 
-    TOTAL_SRC_BYTES=$((TOTAL_SRC_BYTES + osz))
+    total_src_bytes=$((total_src_bytes + osz))
 
     if [[ "$f" == *.csv.gz ]]; then
-      est_total=$((est_total + osz))       # уже сжатый - берём как есть
+      est_total=$((est_total + osz))
     else
       if [[ -n "$EST_RATIO_NUM" && -n "$EST_RATIO_DEN" ]]; then
-        est_total=$(( est_total + $(awk -v os="$osz" -v n="$EST_RATIO_NUM" -v d="$EST_RATIO_DEN" 'BEGIN{printf "%.0f", os*n/d}') ))
+        est_total=$(( est_total +     \
+          $(awk -v os="$osz"          \
+                -v n="$EST_RATIO_NUM" \
+                -v d="$EST_RATIO_DEN" \
+                'BEGIN{printf "%.0f", os*n/d}') ))
       else
-        est_total=$((est_total + osz))     # нет образца - консервативно
+        est_total=$((est_total + osz))
       fi
     fi
   done
 
-  ESTIMATED_GZ_TOTAL="$est_total"
-  PLANNED_BYTES="$est_total"
+  est_gz_total="$est_total"
+  EST_RATIO_NUM="$est_total"
 }
 
 
-func_check_free_space() {  ## Проверка свободного места --------------------- ##
-  mkdir -p -- "$ADBMT_DIR"
-  read -r avail_bytes mount_path < <(func_df_avail_and_target "$ADBMT_DIR")
-  local percent_of_free
-  percent_of_free=$(awk -v y="$PLANNED_BYTES" -v x="$avail_bytes" 'BEGIN{ if (x==0){print "inf"} else {printf "%.2f", 100*y/x} }')
-
+func_check_free_space() {  # Checking free space
+  local free_perc
   local exceed=0
-  if [[ "$percent_of_free" == "inf" ]]; then
+
+  mkdir -p -- "$adbmt_tmp"
+  read -r avail_bytes mnt_path < <(func_df_avail_and_target "$adbmt_tmp")
+
+  free_perc=$(
+              awk -v y="$EST_RATIO_NUM"                 \
+                  -v x="$avail_bytes"                   \
+                  'BEGIN {                              \
+                          if (x==0) {print "inf"}       \
+                          else {printf "%.2f", 100*y/x} \
+                         }'
+             )
+
+  if [[ "$free_perc" == "inf" ]]; then
     exceed=1
   else
-    awk -v p="$percent_of_free" -v f="$free_spc" 'BEGIN{ if (p>f) exit 0; else exit 1 }' && exceed=1 || exceed=0
+    awk -v p="$free_perc" \
+        -v f="$free_spc"        \
+        'BEGIN{ if (p>f) exit 0; else exit 1 }' && \
+      exceed=1 || exceed=0
   fi
 
-  if (( exceed )); then
-    echo "На разделе \"${mount_path}\" для каталога $ADBMT_DIR имеется ${avail_bytes} байт свободного места."
-    echo "Необходимо скачать ${PLANNED_BYTES} байт лог-файлов."
-    echo "Это ${percent_of_free}% от объёма свободного места на разделе \"${mount_path}\", что превышает установленное значение -free-space в ${free_spc} процентов."
-    echo "Необходимо либо увеличить значение -free-space, либо уменьшить объем выборки логов."
+  if ((exceed == 1)); then
+    f_prt "На разделе ${mnt_path} для каталога $adbmt_tmp"
+    f_prt "имеется ${avail_bytes} байт свободного места."
+    f_prt "Необходимо скачать ${EST_RATIO_NUM} байт лог-файлов."
+    f_prt "Это ${free_perc}% от свободного места на разделе ${mnt_path},"
+    f_prt "что превышает установленное в -free-space ${free_spc} процентов."
+    f_prt "Необходимо либо увеличить значение -free-space,"
+    f_prt "либо уменьшить объем выборки логов."
     exit 10
   fi
 }
 
 
-func_copy_with_compression() {  ## Копирование сжатых/несжатых файлов ------- ##
-  mkdir -p -- "$ADBMT_DIR"
-  TOTAL_GZ_BYTES=0
+func_copy_with_compression() {  # Copying csv-files
+  mkdir -p -- "$adbmt_tmp"
+  total_gz_bytes=0
 
   for f in "${SELECTED[@]}"; do
-    local src="$PG_LOG_PATH/$f"
+    local src="$seg_path/$f"
     local base="${f%.csv.gz}"; base="${base%.csv}"
-    local dest="$ADBMT_DIR/${base}.csv.gz"
+    local dest="$adbmt_tmp/${base}.csv.gz"
 
     if [[ "$f" == *.csv.gz ]]; then
-      scp -q "$SEG_HOST:$src" "$dest"
+      scp -q "$seg_host:$src" "$dest"
     else
-      ssh -q "$SEG_HOST" "gzip -c -- '$src'" > "$dest"
+      ssh -q "$seg_host" "gzip -c -- '$src'" > "$dest"
     fi
 
     local gzsz; gzsz=$(stat -c%s -- "$dest")
-    TOTAL_GZ_BYTES=$((TOTAL_GZ_BYTES + gzsz))
+    total_gz_bytes=$((total_gz_bytes + gzsz))
   done
 }
 
 
-func_print_summary() {  ## Итоговая сводка ---------------------------------- ##
-  func_prt_inf "Каталог назначения на выгрузку лог-файлов: $ADBMT_DIR"
-  func_prt_inf "Число лог-файлов для копирования: ${#SELECTED[@]}"
-  # func_prt_inf "Суммарный размер лог-файлов: ${TOTAL_SRC_BYTES} байт, $((TOTAL_SRC_BYTES/1024/1024)) мегабайт"  # что-то ересь какая-то, отключил как ненужную.
-  func_prt_inf "Оценочный размер лог-файлов: ${ESTIMATED_GZ_TOTAL} байт, $((ESTIMATED_GZ_TOTAL/1024/1024)) мегабайт"
-  if (( DRY_RUN != 1 )); then
-    func_prt_inf "Фактический размер лог-файлов: ${TOTAL_GZ_BYTES} байт, $((TOTAL_GZ_BYTES/1024/1024)) мегабайт"
+func_print_summary() {  # print final summary to stdout
+  f_prt "Каталог назначения на выгрузку лог-файлов: $adbmt_tmp"
+  f_prt "Число лог-файлов для копирования: ${#SELECTED[@]}"
+  f_prt "Оценочный размер лог-файлов:"
+  f_prt "${est_gz_total} байт, $((est_gz_total/1024/1024)) мегабайт"
+  if (( dry_run != 1 )); then
+    f_prt "Фактический размер лог-файлов:"
+    f_prt "${total_gz_bytes} байт, $((total_gz_bytes/1024/1024)) мегабайт"
   else
-    func_prt_inf "Опция --dry-run - сжатие и копирование не выполнялись."
+    f_prt "Опция --dry-run - сжатие и копирование не выполнялись."
   fi
-  func_prt_inf "Список файлов:"
-  printf '  %s\n' "${SELECTED[@]}"
+  f_prt "Список файлов:"
+  printf '%s\n' "${SELECTED[@]}"
 }
 
 
-func_main "$@"  ## Точка входа ---------------------------------------------- ##
+func_main "$@"  # from this point script starts running
 exit 0
 
 

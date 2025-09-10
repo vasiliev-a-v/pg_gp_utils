@@ -101,7 +101,10 @@ TOOL_OPTIONS:                                        - Current values:
     Current version of the programme $module.
 
   -help
-    Show this usage help and exit.
+    Show this usage help in english and exit.
+
+  -help-ru
+    Show this usage help in russian and exit.
 
 
 *****************************************************
