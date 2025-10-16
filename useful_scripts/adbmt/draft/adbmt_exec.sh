@@ -25,6 +25,7 @@ EOF
 
   mv $scr_dir/adbmt.tar.gz $scr_dir/adbmt.tar.gz.old
   tar Pcfz $scr_dir/adbmt.tar.gz -C $scr_dir --exclude=adbmt/adbmt.tar.gz --exclude=adbmt/draft adbmt
+  stat     $scr_dir/adbmt.tar.gz
   cp $scr_dir/adbmt.tar.gz $scr_dir/adbmt
   scp $scr_dir/adbmt.tar.gz $ssh_user@$host:/tmp && echo "scp прошёл удачно"
   ssh $ssh_user@$host -q -T << 'EOF'
@@ -38,7 +39,7 @@ EOF
       su - gpadmin
         echo пользователь: $(whoami)
         # bash /tmp/adbmt/adbmt.sh gp_log_collector -free-space 10 -gpseg p0 -start 2025-07-21_00:01 -end 2025-09-10_16:59
-        bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -pxf -t_audit_top -db inc0025383 -start 2025-07-20_00:01 -end 2025-07-22_13:59
+        bash /tmp/adbmt/adbmt.sh gp_log_collector -gpperfmon -db gpadmin -start 2025-07-20_00:01 -end 2025-07-22_13:59
 exit 0
 exit 0
 exit 0

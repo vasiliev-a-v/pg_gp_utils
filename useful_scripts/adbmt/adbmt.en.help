@@ -39,6 +39,7 @@ TOOL_OPTIONS:                                        - Current values:
     Path to the working directory where temporary files
     will be placed during compilation, as well as the final tar.gz.
     This directory should not have spaces characters in its name.
+    The specified directory must exist.
 
   -log <FILENAME>                                    - $LOG_FILE
     Full path to the log file of this executable script.

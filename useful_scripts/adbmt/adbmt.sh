@@ -13,6 +13,8 @@ scrpt_fn=${module%".sh"}              # scriptname without .sh
 declare -a argv=( $* )                # puts argues from CLI into array
 LOG_FILE=$current_path/$scrpt_fn.log  # path to directory log filename
 
+# TODO: to make func_get_sar optional.
+# make sar for one day only by default.
 
 func_make_dtm() {  # add date time to every line in $LOG_FILE
   while IFS= read -r line; do
@@ -65,7 +67,7 @@ func_get_arguments() {  # writes into variables argues from CLI
 
     # arguments:
     -dir )                      if [[ ${argv[$i+1]:0:1} != "-" ]]; then
-                                  adbmt_tmp="${argv[$i+1]}"
+                                  adbmt_tmp="${argv[$i+1]%/}"
                                 fi;;
     -log )                      if [[ ${argv[$i+1]:0:1} != "-" ]]; then
                                   LOG_FILE="${argv[$i+1]}"
@@ -124,6 +126,11 @@ func_check_arguments() {  # check correctness the choice of options
       echo $hostfile
     fi
     exit 1
+  fi
+
+  if [[ ! -d ${adbmt_tmp} ]]; then
+    echo "ERROR: The ${adbmt_tmp} directory must exist and and have permitions to write."
+    echo "HINT: execute in CLI shell command: mkdir -p {adbmt_tmp}"
   fi
 
 }
@@ -515,7 +522,8 @@ func_get_adb_service_logs() {  # get some different service logs
   echo "Getting adb_collected_info diagnostic:"
   bash $PATH_ARENADATA_CONFIGS/adb_collect_info.sh
   gzip -f /tmp/adb_collected_info.txt
-  mv /tmp/adb_collected_info.txt.gz ${adbmt_dir}
+  cp /tmp/adb_collected_info.txt.gz ${adbmt_dir}
+  rm -f /tmp/adb_collected_info.txt.gz
 
   echo "Getting gpAdminLogs from master for the last 7 days and all gpconfig_*:"
   echo "${adbmt_dir}/gpAdminLogs_$(date +%Y%m%d).tar.gz"
@@ -621,7 +629,7 @@ func_get_sar() {  # get sar files from all cluster
   fi
 
   echo "sar directory is: "$SA_DIR
-
+find . \( -name "f*" -o -name "f*" \) -print; find /path -type d -exec chmod 0755 "{}" \;
   gpssh -f $all_hosts \
     "tar Pcfz /tmp/sar_\$(hostname).tar.gz $SA_DIR/${day}; \
     ls -1 /tmp/sar_\$(hostname).tar.gz"

@@ -29,6 +29,7 @@ The gp_log_collector tool can be launched in one of three ways:
 #### 1. collecting DBMS message logs from the master.  
 When collecting DBMS message logs, the utility collects the corresponding files for the period specified by the -start and -end parameters into the working directory on the master node.  
 The working directory can be overridden with the -dir parameter.  
+The specified directory must exist.  
 By default, this is /tmp.  
 When copying, the utility adbmt compresses uncompressed csv-files into a gz-archive.  
 When forming a list of files to copy, the "Evaluator" is used.  
