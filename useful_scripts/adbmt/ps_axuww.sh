@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Copyright (c) 2025, Anton Vasilev. All rights reserved.
+# DESCRIPTION -------------------------------------------------------- #
+# This script ps_axuww.sh copies "ps" utility stdout to CSV-file.
+
+
 ps axuww --sort=-pcpu | awk '
 BEGIN {
   OFS = ","  # Устанавливаем разделитель полей как запятую

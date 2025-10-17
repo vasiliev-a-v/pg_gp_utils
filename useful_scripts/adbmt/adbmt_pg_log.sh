@@ -1,7 +1,8 @@
 #!/bin/bash
 
+# Copyright (c) 2025, Anton Vasilev. All rights reserved.
 # DESCRIPTION -------------------------------------------------------- #
-# adbmt_pg_log.sh
+# adbmt_pg_log.sh script: 
 # Collect ADB server logs from a remote host for a specified period of time
 
 ## Defining global variables ---------------------------------------- ##

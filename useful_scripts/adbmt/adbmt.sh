@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Copyright (c) 2025, Anton Vasilev. All rights reserved.
 # DESCRIPTION -------------------------------------------------------- #
 # adbmt is an analogue of the gpmt utility
 
@@ -129,8 +130,9 @@ func_check_arguments() {  # check correctness the choice of options
   fi
 
   if [[ ! -d ${adbmt_tmp} ]]; then
-    echo "ERROR: The ${adbmt_tmp} directory must exist and and have permitions to write."
+    echo "ERROR: The ${adbmt_tmp} directory must exist and have permitions to write."
     echo "HINT: execute in CLI shell command: mkdir -p {adbmt_tmp}"
+    exit 9
   fi
 
 }

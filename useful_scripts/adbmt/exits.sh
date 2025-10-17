@@ -8,6 +8,7 @@ exit 5 ERROR: variable $MASTER_DATA_DIRECTORY is empty
 exit 6 ERROR: The current user does not match the DBMS system owner user!
 exit 7 ERROR: Can not create directory
 exit 8 ERROR: Errors occurred while copying log files
+exit 9 ERROR: The directory must exist and have permitions to write
 
 
 
